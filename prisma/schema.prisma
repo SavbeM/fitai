@@ -1,0 +1,140 @@
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum EnumProfileActivityLevel {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+// this  enum is used to define activity data type
+// ATOMIC: used for boolean values
+// NUMERIC: used for float values
+// ENUM: used for enum values
+
+enum EnumActivityDataType {
+  ATOMIC
+  NUMERIC
+  ENUM
+}
+
+// this enum is used to calculate profile stats based on user input
+
+enum EnumAllowedValues {
+  VALUE1
+  VALUE2
+  VALUE3
+  VALUE4
+  VALUE5
+}
+
+
+// this enum is used to define the view templates
+enum EnumViewTemplate {
+  TODO
+  // add more templates
+}
+
+// this enum is used to define the tab types
+enum EnumTabType {
+  WORKOUT
+  NUTRITION
+  PROGRESS
+}
+
+model User {
+  id       String    @id @default(auto()) @map("_id") @db.ObjectId
+  name     String
+  email    String?   @unique
+  projects Project[]
+}
+
+model Project {
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  name        String
+  description String
+  profile     Profile?
+  tabs        Tab[]
+  userId      String?   @db.ObjectId
+  goalId      String?   @unique @db.ObjectId
+  projectGoal Goal?    @relation
+  user        User?     @relation(fields: [userId], references: [id])
+}
+
+model Goal {
+  id        String  @id @default(auto()) @map("_id") @db.ObjectId
+  goalStats Json
+  projectId String  @unique @db.ObjectId
+  project   Project @relation(fields: [projectId], references: [id])
+}
+
+model Profile {
+  id            String                    @id @default(auto()) @map("_id") @db.ObjectId
+  age           Int
+  weight        Float
+  height        Float
+  activityLevel EnumProfileActivityLevel?
+  otherStats    Json?
+  projectId     String?                    @unique @db.ObjectId
+  project       Project?                   @relation(fields: [projectId], references: [id])
+}
+
+model Tab {
+  id          String       @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  type        EnumTabType
+  projectId   String?       @db.ObjectId
+  project     Project?      @relation(fields: [projectId], references: [id])
+  algorithms  Algorithm[]
+  workoutPlan WorkoutPlan?
+  activities  Activity[]
+}
+
+model WorkoutPlan {
+  id       String    @id @default(auto()) @map("_id") @db.ObjectId
+  tabId    String?    @unique @db.ObjectId
+  tab      Tab?       @relation(fields: [tabId], references: [id])
+  calendar Calendar? @relation
+}
+
+model Calendar {
+  id            String      @id @default(auto()) @map("_id") @db.ObjectId
+  date          DateTime
+  meta          Json?
+  workoutPlanId String?      @unique @db.ObjectId
+  workoutPlan   WorkoutPlan? @relation(fields: [workoutPlanId], references: [id])
+}
+
+model Activity {
+  id          String               @id @default(auto()) @map("_id") @db.ObjectId
+  title       String
+  description String
+  type        EnumActivityDataType
+  data        ActivityData?        @relation
+  tabId       String?               @db.ObjectId
+  tab         Tab?                  @relation(fields: [tabId], references: [id])
+}
+
+model ActivityData {
+  id         String   @id @default(auto()) @map("_id") @db.ObjectId
+  atomic     Boolean?
+  numeric    Float?
+  enum       EnumAllowedValues?
+  activityId String?   @unique @db.ObjectId
+  activity   Activity? @relation(fields: [activityId], references: [id])
+}
+
+model Algorithm {
+  id                   String       @id @default(auto()) @map("_id") @db.ObjectId
+  name                 String
+  viewTemplate         EnumViewTemplate
+  calculationAlgorithm String
+  tabId                String?       @db.ObjectId
+  tab                  Tab?          @relation(fields: [tabId], references: [id])
+}
