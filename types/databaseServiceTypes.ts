@@ -2,10 +2,17 @@ import {
     Prisma,
     $Enums,
     EnumTabType,
-    EnumAllowedValues,
     EnumProfileActivityLevel,
 } from "@prisma/client";
 
+
+enum EnumAllowedValues {
+    VALUE1,
+    VALUE2,
+    VALUE3,
+    VALUE4,
+    VALUE5,
+}
 
 export interface StatsData {
     [key: string]: number | boolean | EnumAllowedValues;
@@ -49,5 +56,13 @@ export interface CreateActivityArgs {
     title: string;
     description: string;
     type: $Enums.EnumActivityDataType;
-    data: Prisma.ActivityDataCreateWithoutActivityInput;
+    data: ActivityData;
+}
+
+
+
+export interface ActivityData {
+    enum?: number | boolean | EnumAllowedValues | undefined;
+    atomic?: number | boolean | EnumAllowedValues | undefined;
+    numeric?: number | boolean | EnumAllowedValues | undefined;
 }

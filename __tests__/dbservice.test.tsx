@@ -1,15 +1,82 @@
-import { mockDeep } from 'jest-mock-extended';
-import { PrismaClient } from '@prisma/client';
+import { ObjectId } from 'bson';
 import { databaseService } from '@/services/databaseService';
+import {EnumActivityDataType, PrismaClient} from '@prisma/client';
 import { CreateProjectArgs } from '@/types/databaseServiceTypes';
 
-const prisma = mockDeep<PrismaClient>();
+const prisma = new PrismaClient();
+
+describe('databaseService (User methods)', () => {
+    let createdUserId: string;
+
+    afterAll(async () => {
+        // Удаление тестового пользователя после тестов
+        if (createdUserId) {
+            await prisma.user.delete({ where: { id: createdUserId } });
+        }
+    });
+
+    it('should create a user and store it in the database', async () => {
+        const name = 'Test User';
+        const email = 'testuser@example.com';
+
+        const user = await databaseService.createUser(name, email);
+
+        expect(user).toHaveProperty('id');
+        expect(user.name).toBe(name);
+        expect(user.email).toBe(email);
+
+        createdUserId = user.id;
+
+        const userInDb = await prisma.user.findUnique({
+            where: { id: user.id },
+        });
+
+        expect(userInDb).not.toBeNull();
+        expect(userInDb?.name).toBe(name);
+        expect(userInDb?.email).toBe(email);
+    });
+
+    it('should retrieve a user by ID', async () => {
+        const user = await databaseService.getUserById(createdUserId);
+
+        expect(user).not.toBeNull();
+        expect(user?.id).toBe(createdUserId);
+        expect(user?.name).toBe('Test User');
+    });
+
+    it('should update a user name', async () => {
+        const newName = 'Updated User';
+
+        const updatedUser = await databaseService.updateUser(createdUserId, newName);
+
+        expect(updatedUser).not.toBeNull();
+        expect(updatedUser.name).toBe(newName);
+
+        const userInDb = await prisma.user.findUnique({
+            where: { id: createdUserId },
+        });
+
+        expect(userInDb?.name).toBe(newName);
+    });
+
+    it('should delete a user', async () => {
+        await databaseService.deleteUser(createdUserId);
+
+        const userInDb = await prisma.user.findUnique({
+            where: { id: createdUserId },
+        });
+
+        expect(userInDb).toBeNull();
+
+        createdUserId = ''; // Убедимся, что ID не будет использоваться в `afterAll`
+    });
+});
 
 describe('databaseService.createProject', () => {
-    it('should create a project with all related entities', async () => {
-        // Мок входных данных
+    it('should create a project and store it in the database', async () => {
+        const userId = new ObjectId().toString(); // Генерация валидного ObjectId
         const args: CreateProjectArgs = {
-            userId: 'test-user-id',
+            userId,
             name: 'Test Project',
             description: 'Test Description',
             profile: {
@@ -22,69 +89,36 @@ describe('databaseService.createProject', () => {
             goal: {
                 goalData: { targetWeight: 65 },
             },
-            tabs: [
-                {
-                    title: 'Workout',
-                    type: 'WORKOUT',
-                    algorithms: [
-                        {
-                            name: 'Algorithm 1',
-                            viewTemplate: 'TODO',
-                            calculationAlgorithm: 'return x + y;',
-                        },
-                    ],
-                    workoutPlan: undefined,
-                    activities: [
-                        {
-                            title: 'Squats',
-                            description: 'Leg workout',
-                            type: 'ATOMIC',
-                            data: {
-                                atomic: true,
-                                numeric: null,
-                                enum: null,
-                            },
-                        },
-                    ],
-                },
-            ],
+            tabs: [{
+                title: 'Test Tab',
+                type: 'WORKOUT',
+                algorithms: [],
+                activities: [
+                    {
+                        title: 'Test Activity',
+                        description: 'Test Description',
+                        type: EnumActivityDataType.ATOMIC,
+                        data: { atomic: true },
+                    },
+                ],
+            }],
         };
 
-        // Мок результата
-        prisma.project.create.mockResolvedValue({
-            id: 'test-project-id',
-            name: args.name,
-            description: args.description,
-            userId: args.userId,
-            profile: {
-                id: 'test-profile-id',
-                age: args.profile.age,
-                weight: args.profile.weight,
-                height: args.profile.height,
-                activityLevel: args.profile.activityLevel,
-                otherStats: args.profile.otherData,
-            },
-            projectGoal: {
-                id: 'test-goal-id',
-                goalStats: args.goal.goalData,
-            },
-            tabs: [],
-        } as any);
-
-        // Вызов метода
         const result = await databaseService.createProject(args);
 
-        // Проверки
-        expect(prisma.project.create).toHaveBeenCalledWith(
-            expect.objectContaining({
-                data: expect.objectContaining({
-                    name: args.name,
-                    description: args.description,
-                    userId: args.userId,
-                }),
-            })
-        );
         expect(result).toHaveProperty('id');
         expect(result.name).toBe(args.name);
+        expect(result.description).toBe(args.description);
+
+        const projectInDb = await prisma.project.findUnique({
+            where: { id: result.id },
+            include: {
+                profile: true,
+                projectGoal: true,
+            },
+        });
+
+        expect(projectInDb).not.toBeNull();
+        expect(projectInDb?.name).toBe(args.name);
     });
 });

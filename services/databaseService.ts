@@ -75,13 +75,12 @@ export const databaseService = {
                         },
                         workoutPlan: tab.workoutPlan
                             ? {
-                                create: {
-                                    // Add necessary fields for WorkoutPlan if any
-                                },
+                                create: { ...tab.workoutPlan },
                             }
                             : undefined,
+
                         activities: {
-                            create: tab.activities.map(activity => ({
+                            create: tab.activities.map((activity) => ({
                                 title: activity.title,
                                 description: activity.description,
                                 type: activity.type,
@@ -104,11 +103,7 @@ export const databaseService = {
                     include: {
                         algorithms: true,
                         workoutPlan: true,
-                        activities: {
-                            include: {
-                                data: true,
-                            },
-                        },
+                        activities: true,
                     },
                 },
             },
