@@ -45,15 +45,16 @@ model User {
 }
 
 model Project {
-  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  id          String  @id @default(auto()) @map("_id") @db.ObjectId
   name        String
   description String
-  profile     Profile?
+  profile     Profile? @relation
+  profileId   String?  @unique @db.ObjectId
   tabs        Tab[]
-  userId      String?   @db.ObjectId
-  goalId      String?   @unique @db.ObjectId
-  projectGoal Goal?    @relation
-  user        User?     @relation(fields: [userId], references: [id])
+  userId      String  @db.ObjectId
+  goalId      String  @unique @db.ObjectId
+  projectGoal Goal?   @relation
+  user        User    @relation(fields: [userId], references: [id])
 }
 
 model Goal {
@@ -64,57 +65,52 @@ model Goal {
 }
 
 model Profile {
-  id            String                    @id @default(auto()) @map("_id") @db.ObjectId
-  age           Int
-  weight        Float
-  height        Float
-  activityLevel EnumProfileActivityLevel?
-  otherStats    Json?
-  projectId     String?                    @unique @db.ObjectId
-  project       Project?                   @relation(fields: [projectId], references: [id])
+  id         String    @id @default(auto()) @map("_id") @db.ObjectId
+  biometrics Json
+  project    Project?  @relation(fields: [projectId], references: [id])
+  projectId  String?   @unique @db.ObjectId
 }
 
 model Tab {
   id          String       @id @default(auto()) @map("_id") @db.ObjectId
   title       String
   type        EnumTabType
-  projectId   String?       @db.ObjectId
-  project     Project?      @relation(fields: [projectId], references: [id])
+  projectId   String       @db.ObjectId
+  project     Project      @relation(fields: [projectId], references: [id])
   algorithms  Algorithm[]
   workoutPlan WorkoutPlan?
-  activities  Activity[]
 }
 
 model WorkoutPlan {
   id       String    @id @default(auto()) @map("_id") @db.ObjectId
-  tabId    String?    @unique @db.ObjectId
-  tab      Tab?       @relation(fields: [tabId], references: [id])
+  tabId    String?   @unique @db.ObjectId
+  tab      Tab?      @relation(fields: [tabId], references: [id])
   calendar Calendar? @relation
 }
 
 model Calendar {
-  id            String      @id @default(auto()) @map("_id") @db.ObjectId
-  date          DateTime
-  meta          Json?
+  id            String       @id @default(auto()) @map("_id") @db.ObjectId
+  activities    Activity[]
   workoutPlanId String?      @unique @db.ObjectId
   workoutPlan   WorkoutPlan? @relation(fields: [workoutPlanId], references: [id])
 }
 
 model Activity {
   id          String               @id @default(auto()) @map("_id") @db.ObjectId
+  date        DateTime
   title       String
   description String
   type        EnumActivityDataType
   data        Json
-  tabId       String?               @db.ObjectId
-  tab         Tab?                  @relation(fields: [tabId], references: [id])
+  calendarId  String               @db.ObjectId
+  calendar    Calendar             @relation(fields: [calendarId], references: [id])
 }
 
 model Algorithm {
-  id                   String       @id @default(auto()) @map("_id") @db.ObjectId
-  name                 String
+  id                   String           @id @default(auto()) @map("_id") @db.ObjectId
   viewTemplate         EnumViewTemplate
   calculationAlgorithm String
-  tabId                String?       @db.ObjectId
-  tab                  Tab?          @relation(fields: [tabId], references: [id])
+  viewAlgorithm        String
+  tabId                String           @db.ObjectId
+  tab                  Tab              @relation(fields: [tabId], references: [id])
 }
