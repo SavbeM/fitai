@@ -1,68 +1,76 @@
-import {
-    Prisma,
-    $Enums,
-    EnumTabType,
-    EnumProfileActivityLevel,
-} from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
+export type EnumProfileActivityLevel = 'LOW' | 'MEDIUM' | 'HIGH';
+export type EnumActivityDataType = 'ATOMIC' | 'NUMERIC' | 'ENUM';
+export type EnumViewTemplate = 'TODO';
+export type EnumTabType = 'WORKOUT' | 'NUTRITION' | 'PROGRESS';
 
-enum EnumAllowedValues {
-    VALUE1,
-    VALUE2,
-    VALUE3,
-    VALUE4,
-    VALUE5,
-}
-
-export interface StatsData {
-    [key: string]: number | boolean | EnumAllowedValues;
-}
-
-
-export interface CreateProjectArgs {
-    userId: string;
+export interface CreateProjectInput {
     name: string;
     description: string;
-    profile: CreateProfileArgs;
-    tabs: CreateTabArgs[];
-    goal: CreateGoalArgs;
+    userId: string;
+    profile: ProfileInput;
+    tabs: TabInput[];
+    goal: GoalInput;
 }
 
-
-export interface CreateGoalArgs {
-    goalData: StatsData;
+export interface ProfileInput {
+    biometrics: Prisma.InputJsonValue;
 }
 
-
-export interface CreateProfileArgs {
-    age: number;
-    weight: number;
-    height: number;
-    activityLevel: EnumProfileActivityLevel;
-    otherData: StatsData;
-}
-
-
-export interface CreateTabArgs {
+export interface TabInput {
     title: string;
     type: EnumTabType;
-    algorithms: Prisma.AlgorithmCreateWithoutTabInput[];
-    workoutPlan?: Prisma.WorkoutPlanCreateWithoutTabInput;
-    activities: CreateActivityArgs[];
+    algorithms: AlgorithmInput[];
+    workoutPlan?: WorkoutPlanInput;
 }
 
+export interface WorkoutPlanInput {
+    calendar: ActivityInput[];
+}
 
-export interface CreateActivityArgs {
+export interface ActivityInput {
     title: string;
     description: string;
-    type: $Enums.EnumActivityDataType;
-    data: ActivityData;
+    type: EnumActivityDataType;
+    data: ActivityDataInput;
+    date: Date;
 }
 
-
-
-export interface ActivityData {
-    enum?: number | boolean | EnumAllowedValues | undefined;
-    atomic?: number | boolean | EnumAllowedValues | undefined;
-    numeric?: number | boolean | EnumAllowedValues | undefined;
+export interface ActivityDataInput {
+    atomic?: boolean;
+    numeric?: number;
+    enum?: string;
 }
+
+export interface AlgorithmInput {
+    name: string;
+    viewTemplate: EnumViewTemplate;
+    calculationAlgorithm: string;
+    viewAlgorithm: string;
+}
+
+export interface GoalInput {
+    goalStats: Prisma.InputJsonValue;
+}
+
+export type ProjectWithRelations = Prisma.ProjectGetPayload<{
+    include: {
+        profile: true;
+        projectGoal: true;
+        tabs: {
+            include: {
+                algorithms: true;
+                workoutPlan: {
+                    include: {
+                        calendar: {
+                            include: {
+                                activities: true;
+                            };
+                        };
+                    };
+                };
+            };
+        };
+    };
+}>;

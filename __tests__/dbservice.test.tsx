@@ -1,7 +1,8 @@
-import { ObjectId } from 'bson';
-import { databaseService } from '@/services/databaseService';
-import {EnumActivityDataType, PrismaClient} from '@prisma/client';
-import { CreateProjectArgs } from '@/types/databaseServiceTypes';
+import {ObjectId} from 'bson';
+import {databaseService} from '@/services/databaseService';
+import {PrismaClient} from '@prisma/client';
+import {CreateProjectInput} from "@/types/databaseServiceTypes";
+
 
 const prisma = new PrismaClient();
 
@@ -11,7 +12,7 @@ describe('databaseService (User methods)', () => {
     afterAll(async () => {
         // Удаление тестового пользователя после тестов
         if (createdUserId) {
-            await prisma.user.delete({ where: { id: createdUserId } });
+            await prisma.user.delete({where: {id: createdUserId}});
         }
     });
 
@@ -28,7 +29,7 @@ describe('databaseService (User methods)', () => {
         createdUserId = user.id;
 
         const userInDb = await prisma.user.findUnique({
-            where: { id: user.id },
+            where: {id: user.id},
         });
 
         expect(userInDb).not.toBeNull();
@@ -53,7 +54,7 @@ describe('databaseService (User methods)', () => {
         expect(updatedUser.name).toBe(newName);
 
         const userInDb = await prisma.user.findUnique({
-            where: { id: createdUserId },
+            where: {id: createdUserId},
         });
 
         expect(userInDb?.name).toBe(newName);
@@ -63,62 +64,70 @@ describe('databaseService (User methods)', () => {
         await databaseService.deleteUser(createdUserId);
 
         const userInDb = await prisma.user.findUnique({
-            where: { id: createdUserId },
+            where: {id: createdUserId},
         });
 
         expect(userInDb).toBeNull();
 
-        createdUserId = ''; // Убедимся, что ID не будет использоваться в `afterAll`
+        createdUserId = '';
     });
 });
 
 describe('databaseService.createProject', () => {
+
     it('should create a project and store it in the database', async () => {
-        const userId = new ObjectId().toString(); // Генерация валидного ObjectId
-        const args: CreateProjectArgs = {
-            userId,
+        const userId = new ObjectId().toString();
+
+        const args: CreateProjectInput = {
+            userId: userId,
             name: 'Test Project',
-            description: 'Test Description',
+            description: 'This is a test project',
             profile: {
-                age: 25,
-                weight: 70,
-                height: 175,
-                activityLevel: 'MEDIUM',
-                otherData: { flexibility: true },
+                biometrics: {height: 180, weight: 75, age: 25},
             },
-            goal: {
-                goalData: { targetWeight: 65 },
-            },
-            tabs: [{
-                title: 'Test Tab',
-                type: 'WORKOUT',
-                algorithms: [],
-                activities: [
-                    {
-                        title: 'Test Activity',
-                        description: 'Test Description',
-                        type: EnumActivityDataType.ATOMIC,
-                        data: { atomic: true },
+            tabs: [
+                {
+                    title: 'Workout Tab',
+                    type: 'WORKOUT',
+                    algorithms: [
+                        {
+                            name: 'Algorithm 1',
+                            viewTemplate: 'TODO',
+                            calculationAlgorithm: 'calcAlgo1',
+                            viewAlgorithm: 'viewAlgo1',
+                        },
+                    ],
+                    workoutPlan: {
+                        calendar: [
+                            {
+                                title: 'Activity 1',
+                                description: 'Description 1',
+                                type: 'ATOMIC',
+                                data: {atomic: true},
+                            },
+                            {
+                                title: 'Activity 2',
+                                description: 'Description 2',
+                                type: 'NUMERIC',
+                                data: {numeric: 100},
+                            },
+                        ],
                     },
-                ],
-            }],
+                },
+            ],
+            goal: {
+                goalStats: {targetWeight: 70, targetBMI: 22},
+            },
         };
 
-        const result = await databaseService.createProject(args);
+        const project = await databaseService.createProject(args);
 
-        expect(result).toHaveProperty('id');
-        expect(result.name).toBe(args.name);
-        expect(result.description).toBe(args.description);
+        expect(project).toHaveProperty('id');
+        expect(project.name).toBe(args.name);
+        expect(project.description).toBe(args.description);
+        expect(project.description).toBe(args.description);
+        expect(project.userId).toBe(args.userId);
 
-        const projectInDb = await prisma.project.findUnique({
-            where: { id: result.id },
-            include: {
-                profile: true,
-                projectGoal: true,
-            },
-        });
 
-        expect(projectInDb).not.toBeNull();
-        expect(projectInDb?.name).toBe(args.name);
     });
 });

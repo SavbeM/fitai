@@ -52,7 +52,7 @@ model Project {
   profileId   String?  @unique @db.ObjectId
   tabs        Tab[]
   userId      String  @db.ObjectId
-  goalId      String  @unique @db.ObjectId
+  goalId      String?  @unique @db.ObjectId
   projectGoal Goal?   @relation
   user        User    @relation(fields: [userId], references: [id])
 }
