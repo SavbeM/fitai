@@ -6,6 +6,8 @@ import {CreateProjectInput} from "@/types/databaseServiceTypes";
 
 const prisma = new PrismaClient();
 
+
+
 describe('databaseService (User methods)', () => {
     let createdUserId: string;
 
@@ -74,6 +76,8 @@ describe('databaseService (User methods)', () => {
 });
 
 describe('databaseService.createProject', () => {
+    let profileId: string;
+    let projectId: string;
 
     it('should create a project and store it in the database', async () => {
         const userId = new ObjectId().toString();
@@ -104,12 +108,14 @@ describe('databaseService.createProject', () => {
                                 description: 'Description 1',
                                 type: 'ATOMIC',
                                 data: {atomic: true},
+                                date: new Date(),
                             },
                             {
                                 title: 'Activity 2',
                                 description: 'Description 2',
                                 type: 'NUMERIC',
                                 data: {numeric: 100},
+                                date: new Date(),
                             },
                         ],
                     },
@@ -121,13 +127,36 @@ describe('databaseService.createProject', () => {
         };
 
         const project = await databaseService.createProject(args);
+        projectId = project.id;
 
         expect(project).toHaveProperty('id');
         expect(project.name).toBe(args.name);
         expect(project.description).toBe(args.description);
         expect(project.description).toBe(args.description);
         expect(project.userId).toBe(args.userId);
+    });
 
+    it('should get profile by project ID', async () => {
 
+        const profile = await databaseService.getProfileByProjectId(projectId);
+        profileId = profile?.id ?? '';
+        expect(profile).not.toBeNull();
+        expect(profile?.projectId).toBe(projectId);
+    });
+
+    it('should get profile by ID', async () => {
+        const profile = await databaseService.getProfileById(profileId);
+
+        expect(profile).not.toBeNull();
+        expect(profile?.id).toBe(profileId);
+    });
+
+    it('should update profile biometrics', async () => {
+        const newBiometrics = {height: 185, weight: 80, age: 26};
+
+        const updatedProfile = await databaseService.updateProfile(profileId, newBiometrics);
+
+        expect(updatedProfile).not.toBeNull();
+        expect(updatedProfile.biometrics).toEqual(newBiometrics);
     });
 });

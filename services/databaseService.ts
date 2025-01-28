@@ -113,7 +113,28 @@ export const databaseService = {
         });
     },
 
+    // --------------------------//
+    //           Profile         //
+    // --------------------------//
 
+    getProfileById: (profileId: string) => {
+        return prisma.profile.findUnique({
+            where: {id: profileId},
+        });
+    },
+
+    getProfileByProjectId: (projectId: string) => {
+        return prisma.profile.findFirst({
+            where: {projectId},
+        });
+    },
+
+    updateProfile: (profileId: string, biometrics: Prisma.InputJsonValue) => {
+        return prisma.profile.update({
+            where: {id: profileId},
+            data: {biometrics},
+        });
+    },
 };
 
 
