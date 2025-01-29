@@ -26,7 +26,7 @@ export interface TabInput {
 }
 
 export interface WorkoutPlanInput {
-    calendar: ActivityInput[];
+    activities: ActivityInput[];
 }
 
 export interface ActivityInput {
@@ -47,7 +47,8 @@ export interface AlgorithmInput {
     name: string;
     viewTemplate: EnumViewTemplate;
     calculationAlgorithm: string;
-    viewAlgorithm: string;
+    //TODO: replace this shit with normal type
+    viewData: object;
 }
 
 export interface GoalInput {
@@ -63,11 +64,7 @@ export type ProjectWithRelations = Prisma.ProjectGetPayload<{
                 algorithms: true;
                 workoutPlan: {
                     include: {
-                        calendar: {
-                            include: {
-                                activities: true;
-                            };
-                        };
+                        activities: true;
                     };
                 };
             };
