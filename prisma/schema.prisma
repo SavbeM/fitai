@@ -66,7 +66,7 @@ model Profile {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
   biometrics Json
   project    Project? @relation(fields: [projectId], references: [id])
-  projectId  String?  @unique @db.ObjectId
+  projectId  String  @unique @db.ObjectId
 }
 
 model Tab {
@@ -82,7 +82,7 @@ model Tab {
 model WorkoutPlan {
   //TODO: can be extended to include more fields
   id         String     @id @default(auto()) @map("_id") @db.ObjectId
-  tabId      String?    @unique @db.ObjectId
+  tabId      String    @unique @db.ObjectId
   tab        Tab?       @relation(fields: [tabId], references: [id])
   activities Activity[]
 }
@@ -95,7 +95,7 @@ model Activity {
   type          EnumActivityDataType
   data          Json
   workoutPlan   WorkoutPlan?         @relation(fields: [workoutPlanId], references: [id])
-  workoutPlanId String?              @db.ObjectId
+  workoutPlanId String              @db.ObjectId
 }
 
 model Algorithm {

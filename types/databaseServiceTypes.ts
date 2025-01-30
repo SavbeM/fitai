@@ -44,7 +44,6 @@ export interface ActivityDataInput {
 }
 
 export interface AlgorithmInput {
-    name: string;
     viewTemplate: EnumViewTemplate;
     calculationAlgorithm: string;
     //TODO: replace this shit with normal type

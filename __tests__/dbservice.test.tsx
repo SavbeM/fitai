@@ -114,7 +114,6 @@ describe('databaseService', () => {
                         type: 'WORKOUT',
                         algorithms: [
                             {
-                                name: 'Algorithm 1',
                                 viewTemplate: 'TODO',
                                 calculationAlgorithm: 'calcAlgo1',
                                 viewData: {input: 'data1', title: 'title1'},
@@ -200,11 +199,46 @@ describe('databaseService', () => {
 
             await databaseService.deleteProject(tempProject.id);
 
-            const deletedProject = await prisma.project.findUnique({
-                where: {id: tempProject.id},
-            });
+            const checks = await prisma.$transaction([
+                prisma.project.findUnique({ where: { id: tempProject.id } }),
+                prisma.goal.findUnique({ where: { projectId: tempProject.id } }),
+                prisma.profile.findUnique({ where: { projectId: tempProject.id } }),
+                prisma.tab.findMany({ where: { projectId: tempProject.id } }),
+                prisma.algorithm.findMany({
+                    where: { tabId: { in: tempProject.tabs.map(t => t.id) } }
+                }),
+                prisma.workoutPlan.findMany({
+                    where: { tabId: { in: tempProject.tabs.map(t => t.id) } }
+                }),
+                prisma.activity.findMany({
+                    where: {
+                        workoutPlanId: {
+                            in: tempProject.tabs
+                                .map(t => t.workoutPlan?.id)
+                                .filter(Boolean) as string[]
+                        }
+                    }
+                })
+            ]);
 
-            expect(deletedProject).toBeNull();
+            const [
+                project,
+                goal,
+                profile,
+                tabs,
+                algorithms,
+                workoutPlans,
+                activities
+            ] = checks;
+
+            expect(project).toBeNull();
+            expect(goal).toBeNull();
+            expect(profile).toBeNull();
+            expect(tabs).toHaveLength(0);
+            expect(algorithms).toHaveLength(0);
+            expect(workoutPlans).toHaveLength(0);
+            expect(activities).toHaveLength(0);
+
         });
     });
 
@@ -259,7 +293,7 @@ describe('databaseService', () => {
     describe('Tab methods', () => {
         let projectId: string;
         let tabId: string;
-
+        let workoutPlanId: string;
         beforeAll(async () => {
             const project = await databaseService.createProject({
                 userId: new ObjectId().toString(),
@@ -300,7 +334,11 @@ describe('databaseService', () => {
             const tab = await databaseService.addTab(projectId, {
                 title: 'Test Tab',
                 type: 'WORKOUT',
-                algorithms: [],
+                algorithms: [{
+                    viewTemplate: 'TODO',
+                    calculationAlgorithm: 'calcAlgo1',
+                    viewData: {input: 'data1', title: 'title1'}
+                }],
                 workoutPlan: {
                     activities: [
                         {
@@ -315,8 +353,10 @@ describe('databaseService', () => {
             });
 
             tabId = tab.id;
+            workoutPlanId = tab.workoutPlan?.id ?? '';
             expect(tab.title).toBe('Test Tab');
             expect(tab.type).toBe('WORKOUT');
+            expect(tab.algorithms.length).toBe(1);
             expect(tab.workoutPlan?.activities.length).toBe(1);
 
         });
@@ -338,11 +378,285 @@ describe('databaseService', () => {
         });
 
 
+
         it('should delete tab', async () => {
-            await databaseService.deleteTab(tabId);
-            const deletedTab = await prisma.tab.findUnique({where: {id: tabId}});
-            expect(deletedTab).toBeNull();
+        await databaseService.deleteTab(tabId);
+
+        const checks = await prisma.$transaction([
+            prisma.tab.findUnique({where: {id: tabId}}),
+            prisma.algorithm.findMany({where: {tabId: tabId}}),
+            prisma.workoutPlan.findUnique({where: {tabId: tabId}}),
+            prisma.activity.findMany({
+                where: {
+                    workoutPlanId: workoutPlanId
+                }
+            })
+        ]);
+
+        const [
+            deletedTab,
+            remainingAlgorithms,
+            remainingWorkoutPlan,
+            remainingActivities
+        ] = checks;
+
+        expect(deletedTab).toBeNull();
+        expect(remainingAlgorithms).toHaveLength(0);
+        expect(remainingWorkoutPlan).toBeNull();
+        expect(remainingActivities).toHaveLength(0);
+    });
+    });
+
+    describe('Algorithm methods', () => {
+        let projectId: string;
+        let tabId: string;
+        let algorithmId: string;
+
+        beforeAll(async () => {
+            const project = await databaseService.createProject({
+                userId: new ObjectId().toString(),
+                name: 'Test Project for Algorithm',
+                description: 'Test project for algorithm methods',
+                profile: {biometrics: {height: 180, weight: 75, age: 25}},
+                tabs: [
+                    {
+                        title: 'Test Tab',
+                        type: 'WORKOUT',
+                        algorithms: [{
+                            viewTemplate: 'TODO',
+                            calculationAlgorithm: 'calcAlgo1',
+                            viewData: {input: 'data1', title: 'title1'}
+                        }],
+                        workoutPlan: {
+                            activities: [
+                                {
+                                    date: new Date(),
+                                    title: 'Activity 1',
+                                    description: 'Description 1',
+                                    type: 'ATOMIC',
+                                    data: {atomic: true}
+                                },
+                            ],
+                        },
+                    },
+                ],
+                goal: {goalStats: {targetWeight: 70, targetBMI: 22}},
+            });
+
+            projectId = project.id;
+            tabId = project.tabs[0].id;
+            algorithmId = project.tabs[0].algorithms[0].id;
+        });
+
+        afterAll(async () => {
+            if (projectId) {
+                await prisma.$transaction([
+                    prisma.algorithm.deleteMany({
+                        where: {tabId},
+                    }),
+                    prisma.tab.deleteMany({
+                        where: {projectId},
+                    }),
+                    prisma.profile.deleteMany({
+                        where: {projectId},
+                    }),
+                    prisma.goal.deleteMany({
+                        where: {projectId},
+                    }),
+                    prisma.project.delete({
+                        where: {id: projectId},
+                    }),
+                ]);
+            }
+        });
+
+        it('should update algorithm', async () => {
+            const algorithm = await databaseService.updateAlgorithm(algorithmId, {
+                viewTemplate: 'TODO',
+                calculationAlgorithm: 'calcAlgo1',
+                viewData: {input: 'data1', title: 'title1'},
+            });
+
+            algorithmId = algorithm.id;
+            expect(algorithm.viewTemplate).toBe('TODO');
+            expect(algorithm.calculationAlgorithm).toBe('calcAlgo1');
+            expect(algorithm.viewData).toEqual({input: 'data1', title: 'title1'});
+        });
+
+        it('should get algorithm by id', async () => {
+            const fetchedAlgorithm = await databaseService.getAlgorithmById(algorithmId);
+            expect(fetchedAlgorithm?.id).toBe(algorithmId);
+        });
+
+        it('should get algorithms by tab id', async () => {
+            const algorithms = await databaseService.getAlgorithmsByTabId(tabId);
+            expect(algorithms.some(a => a.id === algorithmId)).toBeTruthy();
+        });
+
+        it('should delete algorithm', async () => {
+            await databaseService.deleteAlgorithm(algorithmId);
+            const deletedAlgorithm = await prisma.algorithm.findUnique({where: {id: algorithmId}});
+            expect(deletedAlgorithm).toBeNull();
         });
     });
 
+    describe('Activity methods', () => {
+        let projectId: string;
+        let tabId: string;
+        let workoutPlanId: string;
+        let activityId: string;
+
+        beforeAll(async () => {
+            const project = await databaseService.createProject({
+                userId: new ObjectId().toString(),
+                name: 'Test Project for Activity',
+                description: 'Test project for activity methods',
+                profile: {biometrics: {height: 180, weight: 75, age: 25}},
+                tabs: [
+                    {
+                        title: 'Test Tab',
+                        type: 'WORKOUT',
+                        algorithms: [],
+                        workoutPlan: {
+                            activities: [
+                                {
+                                    date: new Date(),
+                                    title: 'Activity 1',
+                                    description: 'Description 1',
+                                    type: 'ATOMIC',
+                                    data: {atomic: true}
+                                },
+                            ],
+                        },
+                    },
+                ],
+                goal: {goalStats: {targetWeight: 70, targetBMI: 22}},
+            });
+
+            projectId = project.id;
+            tabId = project.tabs[0].id;
+            workoutPlanId = project.tabs[0].workoutPlan?.id ?? '';
+            activityId = project.tabs[0].workoutPlan?.activities[0].id ?? '';
+        });
+
+        afterAll(async () => {
+            if (projectId) {
+                await prisma.$transaction([
+                    prisma.activity.deleteMany({
+                        where: {workoutPlanId},
+                    }),
+                    prisma.workoutPlan.deleteMany({
+                        where: {tabId},
+                    }),
+                    prisma.tab.deleteMany({
+                        where: {projectId},
+                    }),
+                    prisma.profile.deleteMany({
+                        where: {projectId},
+                    }),
+                    prisma.goal.deleteMany({
+                        where: {projectId},
+                    }),
+                    prisma.project.delete({
+                        where: {id: projectId},
+                    }),
+                ]);
+            }
+        });
+
+        it('should get activity by ID', async () => {
+            const activity = await databaseService.getActivityById(activityId);
+            expect(activity?.id).toBe(activityId);
+        });
+
+        it('should get activities by workout plan ID', async () => {
+            const activities = await databaseService.getActivitiesByWorkoutPlanId(workoutPlanId);
+            expect(activities.some(a => a.id === activityId)).toBeTruthy();
+        });
+
+        it('should delete activity', async () => {
+            await databaseService.deleteActivity(activityId);
+            const deletedActivity = await prisma.activity.findUnique({where: {id: activityId}});
+            expect(deletedActivity).toBeNull();
+        });
+    });
+
+    describe('Workout Plan methods', () => {
+    let projectId: string;
+    let tabId: string;
+    let workoutPlanId: string;
+
+    beforeAll(async () => {
+        const project = await databaseService.createProject({
+            userId: new ObjectId().toString(),
+            name: 'Test Project for Workout Plan',
+            description: 'Test project for workout plan methods',
+            profile: {biometrics: {height: 180, weight: 75, age: 25}},
+            tabs: [
+                {
+                    title: 'Test Tab',
+                    type: 'WORKOUT',
+                    algorithms: [],
+                    workoutPlan: {
+                        activities: [
+                            {
+                                date: new Date(),
+                                title: 'Activity 1',
+                                description: 'Description 1',
+                                type: 'ATOMIC',
+                                data: {atomic: true}
+                            },
+                        ],
+                    },
+                },
+            ],
+            goal: {goalStats: {targetWeight: 70, targetBMI: 22}},
+        });
+
+        projectId = project.id;
+        tabId = project.tabs[0].id;
+        workoutPlanId = project.tabs[0].workoutPlan?.id ?? '';
+    });
+
+    afterAll(async () => {
+        if (projectId) {
+            await prisma.$transaction([
+                prisma.activity.deleteMany({
+                    where: {workoutPlanId},
+                }),
+                prisma.workoutPlan.deleteMany({
+                    where: {tabId},
+                }),
+                prisma.tab.deleteMany({
+                    where: {projectId},
+                }),
+                prisma.profile.deleteMany({
+                    where: {projectId},
+                }),
+                prisma.goal.deleteMany({
+                    where: {projectId},
+                }),
+                prisma.project.delete({
+                    where: {id: projectId},
+                }),
+            ]);
+        }
+    });
+
+    it('should get workout plan by ID', async () => {
+        const workoutPlan = await databaseService.getWorkoutPlanById(workoutPlanId);
+        expect(workoutPlan?.id).toBe(workoutPlanId);
+    });
+
+    it('should get workout plan by tab ID', async () => {
+        const workoutPlan = await databaseService.getWorkoutPlanByTabId(tabId);
+        expect(workoutPlan?.tabId).toBe(tabId);
+    });
+
+    it('should delete workout plan', async () => {
+        await databaseService.deleteWorkoutPlan(workoutPlanId);
+        const deletedWorkoutPlan = await prisma.workoutPlan.findUnique({where: {id: workoutPlanId}});
+        expect(deletedWorkoutPlan).toBeNull();
+    });
+});
 });
