@@ -5,6 +5,10 @@ export type EnumActivityDataType = 'ATOMIC' | 'NUMERIC' | 'ENUM';
 export type EnumViewTemplate = 'TODO';
 export type EnumTabType = 'WORKOUT' | 'NUTRITION' | 'PROGRESS';
 
+export const EnumTabTypes = ['WORKOUT', 'NUTRITION', 'PROGRESS'] as const;
+export const EnumActivityDataTypes = ['ATOMIC', 'NUMERIC', 'ENUM'] as const;
+export const EnumViewTemplates = ['TODO'] as const;
+
 export interface CreateProjectInput {
     name: string;
     description: string;
