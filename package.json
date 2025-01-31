@@ -7,12 +7,14 @@
     "build": "next build",
     "start": "next start",
     "test": "jest",
+    "test-ai": "jest __tests__/aiservice.test.ts",
     "lint": "next lint"
   },
   "dependencies": {
     "@prisma/client": "^6.2.1",
     "mongodb": "^6.12.0",
     "next": "15.1.6",
+    "openai": "^4.81.0",
     "prisma": "^6.2.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
