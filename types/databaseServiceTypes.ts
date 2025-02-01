@@ -38,7 +38,7 @@ export interface ActivityInput {
     description: string;
     type: EnumActivityDataType;
     data: ActivityDataInput;
-    date: Date;
+    date: Date | string;
 }
 
 export interface ActivityDataInput {
