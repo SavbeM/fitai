@@ -1,11 +1,10 @@
 import { databaseService } from '@/services/databaseService';
 import type {
-    AlgorithmInput,
     CreateProjectInput,
-    EnumViewTemplate,
+    EnumViewTemplate, GoalInput, ProfileInput,
     TabInput
 } from '@/types/databaseServiceTypes';
-import { Activity, Goal, Prisma, Profile, Project, Tab, User, WorkoutPlan } from '@prisma/client';
+import { Activity, Goal, Profile, Project, Tab, User, WorkoutPlan } from '@prisma/client';
 import { aiService } from '@/services/aiService';
 
 
@@ -80,11 +79,11 @@ export class ProjectBuilder {
      * Генерирует и добавляет план тренировок к проекту через AI.
      */
     public async addWorkoutPlan(): Promise<this> {
-        if (!this._project) {
+        if (!this._project || !this._goal || !this._profile) {
             throw new Error('Project must be built before adding workout plan.');
         }
-        const generatedWorkoutPlan = await aiService.generateWorkoutPlan();
-        const newWorkoutPlan = await databaseService.addWorkoutPlan(this._project.id, generatedWorkoutPlan);
+        const generatedWorkoutPlan  = await aiService.generateWorkoutPlan({gaol: this._goal,profile: this._profile,algorithm: this._algorithms[0]});
+        const newWorkoutPlan  = await databaseService.addWorkoutPlan(this._project.id, generatedWorkoutPlan);
         this._workoutPlan = newWorkoutPlan;
         return this;
     }
@@ -105,12 +104,12 @@ export class ProjectBuilder {
     /**
      * Генерирует и добавляет профиль к проекту через AI.
      */
-    public async addProfile(): Promise<this> {
+    public async addProfile(profile: ProfileInput): Promise<this> {
         if (!this._project) {
             throw new Error('Project must be built before adding profile.');
         }
-        const generatedProfile = await aiService.generateProfile();
-        const newProfile = await databaseService.createProfileForProject(this._project.id, generatedProfile.biometrics);
+
+        const newProfile = await databaseService.createProfileForProject(this._project.id, profile.biometrics);
         this._profile = newProfile;
         return this;
     }
@@ -150,14 +149,15 @@ export class ProjectBuilder {
     /**
      * Возвращает агрегированный результат сборки проекта.
      */
-    public build(): { user: User; project: Project; tabs: Tab[] } {
-        if (!this._user || !this._project || this._tabs.length === 0) {
+    public build(): { user: User; project: Project; tabs: Tab[]; goal: Goal;  } {
+        if (!this._user || !this._project || this._tabs.length === 0 || !this._goal) {
             throw new Error('Incomplete project build: missing user, project or tabs.');
         }
         return {
             user: this._user,
             project: this._project,
             tabs: this._tabs,
+            goal: this._goal,
         };
     }
 }

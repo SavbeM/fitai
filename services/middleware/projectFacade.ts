@@ -20,21 +20,22 @@ export class InitProjectService {
     public async initializeNewProject(params: InitProjectParams) {
         const builder = new ProjectBuilder();
 
-        // 1. Создаем или получаем пользователя
         await builder.buildUser(params.user.id, params.user.name, params.user.email);
 
-        // 2. Создаем проект
         await builder.buildProject(params.project);
 
-        // 3. Добавляем начальный таб (например, типа WORKOUT)
+        await builder.addProfile(params.project.profile);
+
+        await builder.addGoal(params.project.name, params.project.description);
+
         await builder.addTab(params.initialTab.tabData);
 
-        // 4. (Опционально) Вызываем AI-сервис для генерации дополнительного контента
-        // Здесь можно вызывать дополнительные методы builder-а, например,
-        // builder.addProfile(...), builder.addWorkoutPlan(...), builder.addGoal(...), builder.addAlgorithm(...)
+        await builder.addAlgorithm("TODO");
 
+        await builder.addWorkoutPlan();
 
-        // Возвращаем агрегированный результат
-        return { ...builder.build()};
+        await builder.addActivity();
+
+        return { ...builder.build() };
     }
 }
