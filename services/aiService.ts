@@ -43,10 +43,7 @@ export const aiService = {
         }
     },
 
-    /**
-     * Генерирует план тренировок.
-     * @returns Объект, соответствующий типу WorkoutPlanInput.
-     */
+
     async generateWorkoutPlan(
         goal: GoalInput,
         profile: ProfileInput,
@@ -75,10 +72,6 @@ export const aiService = {
         }
     },
 
-    /**
-     * Генерирует данные для профиля.
-     * @returns Объект, соответствующий типу ProfileInput.
-     */
     async generateProfile(
         projectDescription: string,
         projectName: string,
@@ -103,13 +96,7 @@ export const aiService = {
         }
     },
 
-    /**
-     * Генерирует данные для цели проекта.
-     * @param projectName Название проекта
-     * @param projectDescription Описание проекта
-     * @param profile Данные профиля, которые могут повлиять на цель
-     * @returns Объект, соответствующий типу GoalInput.
-     */
+
     async generateGoal(
         projectName: string,
         projectDescription: string,

@@ -50,33 +50,52 @@ export const projectSchema = z.object({
     }),
 });
 
-export const algorithmSchema = z.object({
-    viewTemplate: z.enum(["TODO"]),
-    calculationAlgorithm: z.string(),
-    viewData: z.record(z.any()),
-});
 
-export const workoutPlanSchema = z.object({
-    activities: z.array(
-        z.object({
-            title: z.string(),
-            description: z.string(),
-            type: z.enum(["ATOMIC", "NUMERIC", "ENUM"]),
-            data: z.object({
-                atomic: z.boolean().optional(),
-                numeric: z.number().optional(),
-                enum: z.string().optional(),
-            }),
-            date: z.union([z.string(), z.date()]),
-        })
-    ),
-});
+export const algorithmSchema = z
+    .object({
+        viewTemplate: z.enum(["TODO"]),
+        calculationAlgorithm: z.string(),
+        // OpenAI wants `"additionalProperties": false`,
+        // so we use .strict() instead of .passthrough()
+        viewData: z
+            .object({})
+            .strict(),
+    })
+    .strict();
 
+// For "workoutPlan"
+export const workoutPlanSchema = z
+    .object({
+        activities: z.array(
+            z
+                .object({
+                    title: z.string(),
+                    description: z.string(),
+                    type: z.enum(["ATOMIC", "NUMERIC", "ENUM"]),
+                    data: z
+                        .object({
+                            atomic: z.boolean().optional(),
+                            numeric: z.number().optional(),
+                            enum: z.string().optional(),
+                        })
+                        .strict(),
+                    date: z.string(), // no union with Date, to avoid schema issues
+                })
+                .strict()
+        ),
+    })
+    .strict();
 
-export const profileSchema = z.object({
-    biometrics: z.record(z.any()),
-});
+// For "profile"
+export const profileSchema = z
+    .object({
+        biometrics: z.object({}).strict(),
+    })
+    .strict();
 
-export const goalSchema = z.object({
-    goalStats: z.record(z.any()),
-});
+// For "goal"
+export const goalSchema = z
+    .object({
+        goalStats: z.object({}).strict(),
+    })
+    .strict();
