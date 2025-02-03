@@ -1,4 +1,3 @@
-import { aiService } from '@/services/aiService';
 import type { CreateProjectInput, EnumTabType, TabInput } from '@/types/databaseServiceTypes';
 import {ProjectBuilder} from "@/services/middleware/projectBuilder";
 
@@ -34,7 +33,6 @@ export class InitProjectService {
 
         await builder.addWorkoutPlan();
 
-        await builder.addActivity();
 
         return { ...builder.build() };
     }

@@ -53,17 +53,14 @@ export const projectSchema = z.object({
 
 export const algorithmSchema = z
     .object({
-        viewTemplate: z.enum(["TODO"]),
+        viewTemplate: z.enum(EnumViewTemplates),
         calculationAlgorithm: z.string(),
-        // OpenAI wants `"additionalProperties": false`,
-        // so we use .strict() instead of .passthrough()
         viewData: z
             .object({})
             .strict(),
     })
     .strict();
 
-// For "workoutPlan"
 export const workoutPlanSchema = z
     .object({
         activities: z.array(
@@ -71,7 +68,7 @@ export const workoutPlanSchema = z
                 .object({
                     title: z.string(),
                     description: z.string(),
-                    type: z.enum(["ATOMIC", "NUMERIC", "ENUM"]),
+                    type: z.enum(EnumActivityDataTypes),
                     data: z
                         .object({
                             atomic: z.boolean().optional(),
@@ -79,21 +76,21 @@ export const workoutPlanSchema = z
                             enum: z.string().optional(),
                         })
                         .strict(),
-                    date: z.string(), // no union with Date, to avoid schema issues
+                    date: z.string(),
                 })
                 .strict()
         ),
     })
     .strict();
 
-// For "profile"
-export const profileSchema = z
+
+export const profileBiometricsSchema = z
     .object({
-        biometrics: z.object({}).strict(),
+        values: z.array(z.string()),
+        types: z.array(z.string()),
     })
     .strict();
 
-// For "goal"
 export const goalSchema = z
     .object({
         goalStats: z.object({}).strict(),

@@ -5,7 +5,7 @@ import type {
     TabInput
 } from '@/types/databaseServiceTypes';
 import { Activity, Goal, Profile, Project, Tab, User, WorkoutPlan } from '@prisma/client';
-import { aiService } from '@/services/aiService';
+import { aiService } from '@/services/ai_module/aiService';
 
 
 /**
@@ -88,18 +88,6 @@ export class ProjectBuilder {
         return this;
     }
 
-    /**
-     * Генерирует и добавляет активность в план тренировок через AI.
-     */
-    public async addActivity(): Promise<this> {
-        if (!this._workoutPlan) {
-            throw new Error('WorkoutPlan must be built before adding activities.');
-        }
-        const generatedActivity = await aiService.generateActivity();
-        const newActivity = await databaseService.addActivity(this._workoutPlan.id, generatedActivity);
-        this._activities.push(newActivity);
-        return this;
-    }
 
     /**
      * Генерирует и добавляет профиль к проекту через AI.

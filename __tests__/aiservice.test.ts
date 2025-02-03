@@ -1,14 +1,15 @@
-import { aiService } from "@/services/aiService";
+import { aiService } from "@/services/ai_module/aiService";
 import type {
     AlgorithmInput,
     WorkoutPlanInput,
     ProfileInput,
     GoalInput,
 } from "@/types/databaseServiceTypes";
+import {BiometricsResponse} from "@/services/ai_module/types";
 
 describe("aiService (integration)", () => {
     // Increase timeout for potentially long requests
-    jest.setTimeout(20000);
+    jest.setTimeout(30000);
 
     it("should generate an algorithm", async () => {
         const profile: ProfileInput = {
@@ -43,9 +44,10 @@ describe("aiService (integration)", () => {
         const projectDescription = "Test project for weight loss";
         const projectName = "LoseWeight";
         // This might take time, so it's good we increased the timeout
-        const result: ProfileInput = await aiService.generateProfile(projectDescription, projectName);
+        const result: BiometricsResponse = await aiService.generateProfile(projectDescription, projectName);
         console.log("Profile =>", result);
-        expect(result).toHaveProperty("biometrics");
+        expect(result).toHaveProperty("values");
+        expect(result).toHaveProperty("types");
     });
 
     it("should generate a goal", async () => {
