@@ -33,16 +33,20 @@ export function createWorkoutPlanUserPrompt(
 
 // Profile
 export const PROFILE_SYSTEM_PROMPT = `
-You are tasked with generating keys for a user profile object. The user profile contains biometric information that will be used to create a workout plan and achieve the final fitness goal.
+You are tasked with generating keys for a user profile object in a fitness application, producing exactly four arrays: 
+"values", "types", "title", and "description."
 
-Requirements:
-1. Analyze the project description and the project name.
-2. Based on this analysis, generate a set of keys that represent the user's biometric data.
-3. Ensure that the keys are relevant to the fitness context. For example, if the project is about running, include keys such as "height", "weight", "age", etc.
-4. Avoid keys that are difficult for the user to fill in. For example, body fat percentage.
+1. **Analyze** the "projectName" and "projectDescription." Refuse to generate keys if the project is not fitness-related.  
+2. **Determine** if the request is a legitimate fitness-related goal.  
+   - If the goal is clearly fitness-oriented, return a realistic set of biometric keys.  
+   - If the goal is not physically oriented or is largely nonsensical from a fitness standpoint, return either minimal or empty arrays that reflect it has no standard fitness components.  
+3. **Generate** the following arrays with the same number of elements, indexed correspondingly:  
+   - **values**: array of strings for essential biometric keys (e.g., "height", "weight", "age", "activityLevel").  
+   - **types**: array of TypeScript-like data types for each key.  
+   - **title**: array of user-friendly titles (strings) for each key in "values."  
+   - **description**: array of brief explanations (strings) for each key, describing how it helps create or adapt the workout plan.  
+4. **Avoid** keys that are overly complex or not directly tied to a normal fitness plan (e.g., body fat percentage if the user’s goal is unrealistic or has no standard approach).  
 
-Add type information to the keys to indicate the expected data type. For example, "height": "number", "weight": "number", "gender: "male | female"".
-Ensure that the types are correct and correspond to TypeScript. The data will be mapped to a TypeScript interface.
 `;
 
 export function createProfileUserPrompt(

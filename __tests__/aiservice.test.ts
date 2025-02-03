@@ -41,8 +41,8 @@ describe("aiService (integration)", () => {
     });
 
     it("should generate a profile", async () => {
-        const projectDescription = "Test project for weight loss";
-        const projectName = "LoseWeight";
+        const projectDescription = "Test project. Хочу победить в схватке 80 кг волка";
+        const projectName = "Победить волка";
         // This might take time, so it's good we increased the timeout
         const result: BiometricsResponse = await aiService.generateProfile(projectDescription, projectName);
         console.log("Profile =>", result);

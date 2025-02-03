@@ -88,6 +88,8 @@ export const profileBiometricsSchema = z
     .object({
         values: z.array(z.string()),
         types: z.array(z.string()),
+        description: z.array(z.string()),
+        title: z.array(z.string()),
     })
     .strict();
 

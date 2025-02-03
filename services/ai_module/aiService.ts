@@ -68,6 +68,7 @@ export const aiService = {
                 { role: "system", content: WORKOUT_PLAN_SYSTEM_PROMPT },
                 { role: "user", content: createWorkoutPlanUserPrompt(goal, profile, algorithm) },
             ],
+            temperature: 0.8,
             response_format: zodResponseFormat(workoutPlanSchema, "workoutPlan"),
         });
 
