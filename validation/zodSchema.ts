@@ -53,13 +53,11 @@ export const projectSchema = z.object({
 
 export const algorithmSchema = z
     .object({
-        viewTemplate: z.enum(EnumViewTemplates),
         calculationAlgorithm: z.string(),
-        viewData: z
-            .object({})
-            .strict(),
     })
     .strict();
+
+export  type AlgorithmAI = z.infer<typeof algorithmSchema>;
 
 export const workoutPlanSchema = z
     .object({
@@ -86,15 +84,31 @@ export const workoutPlanSchema = z
 
 export const profileBiometricsSchema = z
     .object({
-        values: z.array(z.string()),
+        keys: z.array(z.string()),
         types: z.array(z.string()),
         description: z.array(z.string()),
         title: z.array(z.string()),
     })
     .strict();
 
+export type ProfileBiometricsArray = z.infer<typeof profileBiometricsSchema>;
+
+
 export const goalSchema = z
     .object({
-        goalStats: z.object({}).strict(),
+        keys: z.array(z.string()),
+        types: z.array(z.string()),
+        values: z.array(z.string())
     })
     .strict();
+
+export type GoalArray = z.infer<typeof goalSchema>;
+
+
+export const activitySchema = z.object({
+    title: z.string(),
+    description: z.string(),
+    type: z.enum(EnumActivityDataTypes),
+})
+
+export type ActivityCandidate = z.infer<typeof activitySchema>;

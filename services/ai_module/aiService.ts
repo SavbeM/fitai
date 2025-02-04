@@ -1,46 +1,45 @@
-import { zodResponseFormat } from "openai/helpers/zod";
+import {zodResponseFormat} from "openai/helpers/zod";
 import {
+    ActivityCandidate,
+    activitySchema, AlgorithmAI,
     algorithmSchema,
-    goalSchema, profileBiometricsSchema,
-
+    GoalArray,
+    goalSchema,
+    ProfileBiometricsArray,
+    profileBiometricsSchema,
     workoutPlanSchema
 } from "@/validation/zodSchema";
 import OpenAI from "openai";
 
-import type {
-    AlgorithmInput,
-    WorkoutPlanInput,
-    ProfileInput,
-    GoalInput
-} from "@/types/databaseServiceTypes";
+import type {AlgorithmInput, GoalInput, ProfileInput, WorkoutPlanInput} from "@/types/databaseServiceTypes";
 
 
 import {
+    ACTIVITIES_SYSTEM_PROMPT,
     ALGORITHM_SYSTEM_PROMPT,
     createAlgorithmUserPrompt,
-    WORKOUT_PLAN_SYSTEM_PROMPT,
-    createWorkoutPlanUserPrompt,
-    PROFILE_SYSTEM_PROMPT,
+    createGoalUserPrompt,
     createProfileUserPrompt,
+    createWorkoutPlanUserPrompt,
     GOAL_SYSTEM_PROMPT,
-    createGoalUserPrompt
+    PROFILE_SYSTEM_PROMPT,
+    WORKOUT_PLAN_SYSTEM_PROMPT
 } from "./prompts";
 
-import {BiometricsResponse} from "@/services/ai_module/types"; // Importing prompt templates
 
 const openai = new OpenAI();
 
 export const aiService = {
     async generateAlgorithm(
-        viewTemplate: string,
-        profile: ProfileInput,
-        goal: GoalInput
-    ): Promise<AlgorithmInput> {
+        activities: ActivityCandidate[],
+        profile: object,
+        goal: object
+    ): Promise<AlgorithmAI> {
         const completion = await openai.beta.chat.completions.parse({
             model: "gpt-4o-2024-08-06",
             messages: [
                 { role: "system", content: ALGORITHM_SYSTEM_PROMPT },
-                { role: "user", content: createAlgorithmUserPrompt(viewTemplate, profile, goal) },
+                { role: "user", content: createAlgorithmUserPrompt(activities, profile, goal) },
             ],
             response_format: zodResponseFormat(algorithmSchema, "algorithm"),
         });
@@ -88,7 +87,7 @@ export const aiService = {
     async generateProfile(
         projectDescription: string,
         projectName: string
-    ): Promise<BiometricsResponse> {
+    ): Promise<ProfileBiometricsArray> {
         const completion = await openai.beta.chat.completions.parse({
             model: "gpt-4o",
             messages: [
@@ -113,8 +112,8 @@ export const aiService = {
     async generateGoal(
         projectName: string,
         projectDescription: string,
-        profile: ProfileInput
-    ): Promise<GoalInput> {
+        profile: ProfileBiometricsArray
+    ): Promise<GoalArray> {
         const completion = await openai.beta.chat.completions.parse({
             model: "gpt-4o",
             messages: [
@@ -135,4 +134,58 @@ export const aiService = {
             throw new Error("Invalid AI response format for goal.");
         }
     },
+
+    async  generateActivities(
+        goal: GoalArray,
+        profile: ProfileBiometricsArray,
+        userChoice: (activityCandidate: ActivityCandidate) => Promise<boolean>
+    ): Promise<{ activities: ActivityCandidate[] }> {
+
+        const acceptedActivities: ActivityCandidate[] = [];
+        const declinedActivities: ActivityCandidate[] = [];
+        const maxIterations = 20;
+        let iterations = 0;
+
+        while (acceptedActivities.length < 10 && iterations < maxIterations) {
+            iterations++;
+            const completion = await openai.beta.chat.completions.parse({
+                model: "gpt-4o",
+                messages: [
+                    {
+                        role: "system",
+                        content: ACTIVITIES_SYSTEM_PROMPT
+                    },
+                    { role: "user", content: JSON.stringify({ goal, profile, generatedActivities: [...declinedActivities, ...acceptedActivities] } ) },
+                ],
+                response_format: zodResponseFormat(activitySchema, "activity"),
+            });
+
+            const result = completion.choices[0].message?.content;
+            if (!result) {
+                console.error("No result received for candidate activity.");
+                continue;
+            }
+            let candidateActivity;
+            try {
+                candidateActivity = JSON.parse(result);
+                candidateActivity = activitySchema.parse(candidateActivity);
+            } catch (e) {
+                console.error("Error parsing candidate activity:", e);
+                continue;
+            }
+
+            const approved = await userChoice(candidateActivity);
+            if (approved) {
+                acceptedActivities.push(candidateActivity);
+            } else {
+                declinedActivities.push(candidateActivity);
+            }
+        }
+
+        if (acceptedActivities.length < 10) {
+            console.warn("Not enough activities approved. Returning available activities.");
+        }
+
+        return {activities: acceptedActivities};
+    }
 };
