@@ -3,7 +3,7 @@ import type {
     AlgorithmInput,
     WorkoutPlanInput,
     ProfileInput,
-    GoalInput,
+    GoalInput, ActivityInput,
 } from "@/types/databaseServiceTypes";
 import {ActivityCandidate, AlgorithmAI, GoalArray, ProfileBiometricsArray} from "@/validation/zodSchema";
 import {object_generator} from "@/utils/object_generator";
@@ -80,11 +80,12 @@ describe("aiService (integration)", () => {
                 description: 'This determines your current capability and helps structure a gradual plan to help achieve your 100 kg bench press goal.'
             }
         }
+
         const goalDefinition = {'maxBenchPress': {type: 'Number', value: '100'}}
 
         const result: AlgorithmAI = await aiService.generateAlgorithm(activities, profileDefinition, goalDefinition);
         console.log("Algorithm =>", result);
-        const evalResult = runDynamicFunction(result.calculationAlgorithm, "generateWorkoutPlan", profileDefinition, goalDefinition);
+        const evalResult = runDynamicFunction(result.calculationAlgorithm, "generateWorkoutPlan", profileDefinition, goalDefinition, activities);
 
         console.log("Algorithm =>", evalResult);
 
