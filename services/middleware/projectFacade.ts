@@ -1,18 +1,21 @@
-import type { CreateProjectInput, EnumTabType, TabInput } from '@/types/databaseServiceTypes';
-import {ProjectBuilder} from "@/services/middleware/projectBuilder";
+import type { EnumTabType, EnumViewTemplate, TabInput} from '@/types/databaseServiceTypes';
+import {BuildProject, ProjectBuilder} from "@/services/middleware/projectBuilder";
+import {ActivityCandidate} from "@/validation/zodSchema";
 
 
 export interface InitProjectParams {
     user: {
         id?: string;
         name: string;
-        email?: string;
+        email: string;
     };
-    project: Omit<CreateProjectInput, 'userId'>;
+project: Omit<BuildProject, "userId">;
     initialTab: {
         type: EnumTabType;
         tabData: TabInput;
     };
+    viewTemplate: EnumViewTemplate;
+    userChoice: (activityCandidate: ActivityCandidate) => Promise<boolean>;
 }
 
 export class InitProjectService {
@@ -23,17 +26,16 @@ export class InitProjectService {
 
         await builder.buildProject(params.project);
 
-        await builder.addProfile(params.project.profile);
+        await builder.addProfile();
 
-        await builder.addGoal(params.project.name, params.project.description);
+        await builder.addGoal();
+
+        await builder.addActivities(params.userChoice);
+
+        await builder.addWorkoutPlan(params.viewTemplate);
 
         await builder.addTab(params.initialTab.tabData);
 
-        await builder.addAlgorithm("TODO");
-
-        await builder.addWorkoutPlan();
-
-
-        return { ...builder.build() };
+        return await builder.build();
     }
 }

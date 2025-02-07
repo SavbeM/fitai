@@ -1,151 +1,158 @@
-import { databaseService } from '@/services/databaseService';
+import {databaseService} from '@/services/databaseService';
 import type {
+    ActivityInput,
     CreateProjectInput,
-    EnumViewTemplate, GoalInput, ProfileInput,
-    TabInput
+    EnumViewTemplate,
+    TabInput,
+    WorkoutPlanInput
 } from '@/types/databaseServiceTypes';
-import { Activity, Goal, Profile, Project, Tab, User, WorkoutPlan } from '@prisma/client';
-import { aiService } from '@/services/ai_module/aiService';
+import {Project, User} from '@prisma/client';
+import {aiService} from '@/services/ai_module/aiService';
+import {runDynamicFunction} from "@/utils/execute_func";
+import {ActivityCandidate, GoalArray, ProfileBiometricsArray} from "@/validation/zodSchema";
+import {object_generator} from "@/utils/object_generator";
 
 
-/**
- * Класс, отвечающий за пошаговое создание агрегата "Проект"
- */
+export interface BuildProject {
+    name: string
+    description: string
+    userId: string
+}
+
 export class ProjectBuilder {
-    private _user: User | null = null;
-    private _project: Project | null = null;
-    private _tabs: Tab[] = [];
-    private _goal: Goal | null = null;
-    private _algorithms: Algorithm[] = [];
-    private _workoutPlan: WorkoutPlan | null = null;
-    private _activities: Activity[] = [];
-    private _profile: Profile | null = null;
+    private user: User | null = null;
+    private project: BuildProject | null = null;
+    private tabs: TabInput[] = [];
+    private goal: GoalArray | null = null;
+    private workoutPlan: WorkoutPlanInput | null = null;
+    private activities: ActivityCandidate[] = [];
+    private profile: ProfileBiometricsArray | null = null;
 
-    /**
-     * Создает или получает пользователя.
-     */
-    public async buildUser(id: string | undefined, name: string, email?: string): Promise<this> {
+    public async buildUser(id: string | undefined, name: string, email: string): Promise<this> {
         if (id) {
-            this._user = await databaseService.getUserById(id);
+            this.user = await databaseService.getUserById(id);
         }
-        if (!this._user) {
-            this._user = await databaseService.createUser(name, email);
+        if (!this.user) {
+            this.user = await databaseService.createUser(name, email);
         }
         return this;
     }
 
-    /**
-     * Создает проект, привязывая его к уже созданному пользователю.
-     * @param projectData Данные проекта (без поля userId)
-     */
-    public async buildProject(projectData: Omit<CreateProjectInput, 'userId'>): Promise<this> {
-        if (!this._user) {
-            throw new Error('User must be initialized before building project.');
+    public async buildProject(projectData: Omit<BuildProject, 'userId'>): Promise<this> {
+        if (!this.user) {
+            throw new Error('User must be built before creating a project.');
         }
-        const projectInput: CreateProjectInput = {
+        this.project = {
             ...projectData,
-            userId: this._user.id,
+            userId: this.user.id,
         };
-
-        this._project = await databaseService.createProject(projectInput);
         return this;
     }
 
-    /**
-     * Добавляет таб к созданному проекту.
-     * Если в tabData отсутствуют алгоритмы или workoutPlan, они будут сгенерированы через AI.
-     * @param tabData Данные таба
-     */
-    public async addTab(tabData: TabInput): Promise<this> {
-        if (!this._project) {
+    public async addTab(tabData: Omit<TabInput, "workoutPlan">): Promise<this> {
+        if (!this.project || !this.workoutPlan) {
             throw new Error('Project must be built before adding tabs.');
         }
 
-        if (!tabData.algorithms || tabData.algorithms.length === 0) {
-            const generatedAlgorithm = await aiService.generateAlgorithm("TODO", this._profile, this._goal);
-            tabData.algorithms = [generatedAlgorithm];
+        const newTab = {
+            ...tabData,
+            workoutPlan: this.workoutPlan,
         }
 
-        if (!tabData.workoutPlan) {
-            const generatedWorkoutPlan = await aiService.generateWorkoutPlan();
-            tabData.workoutPlan = generatedWorkoutPlan;
-        }
-        const newTab = await databaseService.addTab(this._project.id, tabData);
-        this._tabs.push(newTab);
+        this.tabs.push(newTab);
         return this;
     }
 
-    /**
-     * Генерирует и добавляет план тренировок к проекту через AI.
-     */
-    public async addWorkoutPlan(): Promise<this> {
-        if (!this._project || !this._goal || !this._profile) {
+    public async addActivities(userChoice: (activityCandidate: ActivityCandidate) => Promise<boolean>): Promise<this> {
+        if (!this.project) {
+            throw new Error('Project must be built before adding activities.');
+        }
+        if (!this.profile || !this.goal) {
+            throw new Error('Profile and goal must be added before adding activities.');
+        }
+        //Я конченный долбаеб
+        const result = await aiService.generateActivities(this.goal, this.profile, userChoice);
+        this.activities = result.activities;
+        return this;
+    }
+
+    public async addWorkoutPlan(viewTemplate: EnumViewTemplate): Promise<this> {
+        if (!this.project || !this.goal || !this.profile || !this.activities.length) {
             throw new Error('Project must be built before adding workout plan.');
         }
-        const generatedWorkoutPlan  = await aiService.generateWorkoutPlan({gaol: this._goal,profile: this._profile,algorithm: this._algorithms[0]});
-        const newWorkoutPlan  = await databaseService.addWorkoutPlan(this._project.id, generatedWorkoutPlan);
-        this._workoutPlan = newWorkoutPlan;
+
+        const algo = await aiService.generateAlgorithm(this.activities, this.goal, this.profile);
+        const generatedWorkoutPlan: {activities: ActivityInput[]} = runDynamicFunction(algo.calculationAlgorithm, "generateWorkoutPlan", this.profile, this.goal, this.activities);
+
+        this.workoutPlan = {
+            activities: generatedWorkoutPlan.activities,
+            algorithm: algo,
+            viewTemplate: viewTemplate,
+        }
         return this;
     }
 
-
-    /**
-     * Генерирует и добавляет профиль к проекту через AI.
-     */
-    public async addProfile(profile: ProfileInput): Promise<this> {
-        if (!this._project) {
+    public async addProfile(): Promise<this> {
+        if (!this.project) {
             throw new Error('Project must be built before adding profile.');
         }
+        const result = await aiService.generateProfile(this.project.description, this.project.name);
 
-        const newProfile = await databaseService.createProfileForProject(this._project.id, profile.biometrics);
-        this._profile = newProfile;
+        if (!result.keys.length || !result.title || !result.types.length || !result.description ) {
+            throw new Error('Profile generation failed.');
+        }
+
+        this.profile = result;
+
         return this;
     }
 
-    /**
-     * Генерирует и добавляет цель к проекту через AI.
-     * @param projectName Название проекта
-     * @param projectDescription Описание проекта
-     */
-    public async addGoal(projectName: string, projectDescription: string): Promise<this> {
-        if (!this._project) {
+
+    public async addGoal(): Promise<this> {
+        if (!this.project) {
             throw new Error('Project must be built before adding goal.');
         }
-        if (!this._profile) {
+        if (!this.profile) {
             throw new Error('Profile must be added before adding goal.');
         }
-        const generatedGoal = await aiService.generateGoal(projectName, projectDescription, this._profile);
-        this._goal = generatedGoal;
+
+
+        const result = await aiService.generateGoal(this.project.name, this.project.description, this.profile);
+
+        if(!result.keys.length || !result.types.length || !result.values.length) {
+            throw new Error("Goal generation error")
+        }
+
+        this.goal = result;
+
         return this;
+
     }
 
-    /**
-     * Генерирует и добавляет алгоритм к первому табу проекта через AI.
-     * @param viewTemplate Один из шаблонов EnumViewTemplate
-     */
-    public async addAlgorithm(viewTemplate: EnumViewTemplate): Promise<this> {
-        if (this._tabs.length === 0) {
-            throw new Error('At least one tab must be added before adding algorithm.');
-        }
-        const tabId = this._tabs[0].id;
-        const generatedAlgorithm = await aiService.generateAlgorithm(viewTemplate, this._profile, this._goal);
-        const newAlgorithm = await databaseService.addAlgorithm(tabId, generatedAlgorithm);
-        this._algorithms.push(newAlgorithm);
-        return this;
-    }
 
-    /**
-     * Возвращает агрегированный результат сборки проекта.
-     */
-    public build(): { user: User; project: Project; tabs: Tab[]; goal: Goal;  } {
-        if (!this._user || !this._project || this._tabs.length === 0 || !this._goal) {
-            throw new Error('Incomplete project build: missing user, project or tabs.');
+    public async build(): Promise<Project> {
+        if (!this.project || !this.user || !this.profile || !this.goal || !this.workoutPlan) {
+            throw new Error('All components must be built before finalizing the project.');
         }
-        return {
-            user: this._user,
-            project: this._project,
-            tabs: this._tabs,
-            goal: this._goal,
-        };
+
+        console.log("Profile =>", this.profile);
+        console.log("Goal =>", this.goal);
+
+        const formattedData = object_generator({profile: this.profile, goal: this.goal});
+
+        console.log("Formatted data =>", formattedData);
+
+        const projectInput: CreateProjectInput = {
+            ...this.project,
+            profile: {
+                biometrics: formattedData.profileDefinition,
+            },
+            tabs: this.tabs,
+            goal: {
+                goalStats: formattedData.goalDefinition,
+            },
+        }
+
+        return await databaseService.createProject(projectInput);
     }
 }

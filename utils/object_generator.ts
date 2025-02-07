@@ -3,7 +3,7 @@ import {ObjectGeneratorArgs, ObjectGeneratorReturnType} from "@/services/ai_modu
 
 
 
-function generateProfileDefinition(
+export function generateProfileDefinition(
     profileData: ProfileBiometricsArray
 ): Record<string, { type: string; title: string; description: string }> {
     const { keys, types, title, description } = profileData;
@@ -25,7 +25,7 @@ function generateProfileDefinition(
     return profileDefinition;
 }
 
-function generateGoalDefinition(goalData: GoalArray): Record<string, { type: string; value: string }> {
+export function generateGoalDefinition(goalData: GoalArray): Record<string, { type: string; value: string }> {
     const goalDefinition: Record<string, { type: string; value: string }> = {};
     const { keys, types, values } = goalData;
 
