@@ -16,6 +16,7 @@ project: Omit<BuildProject, "userId">;
     };
     viewTemplate: EnumViewTemplate;
     userChoice: (activityCandidate: ActivityCandidate) => Promise<boolean>;
+    fillProfile: (profileData: ProfileBiometricsArray) => Promise<ProfileBiometricsArray>;
 }
 
 export class InitProjectService {
@@ -26,7 +27,7 @@ export class InitProjectService {
 
         await builder.buildProject(params.project);
 
-        await builder.addProfile();
+        await builder.addProfile(params.fillProfile);
 
         await builder.addGoal();
 

@@ -1,11 +1,11 @@
 import { PrismaClient, Prisma } from '@prisma/client';
 import { AlgorithmInput, CreateProjectInput, TabInput } from "@/types/databaseServiceTypes";
 
-const prisma = new PrismaClient();
+export const prisma = new PrismaClient();
 
 export const databaseService = {
     // ------------- User ---------------
-    createUser: (name: string, email?: string) => {
+    createUser: (name: string, email: string) => {
         try {
             return prisma.user.create({
                 data: { name, email },
@@ -66,25 +66,22 @@ export const databaseService = {
                         create: tabs.map(tab => ({
                             title: tab.title,
                             type: tab.type,
-                            algorithms: {
-                                create: tab.algorithms.map(algorithm => ({
-                                    viewTemplate: algorithm.viewTemplate,
-                                    calculationAlgorithm: algorithm.calculationAlgorithm,
-                                    viewData: algorithm.viewData,
-                                })),
-                            },
                             workoutPlan: tab.workoutPlan
                                 ? {
                                     create: {
+                                        viewTemplate: tab.workoutPlan.viewTemplate,
                                         activities: {
                                             create: tab.workoutPlan.activities.map(activity => ({
-                                                date: activity.date ? activity.date : new Date(),
+                                                date: activity.date ? new Date(activity.date) : new Date(),
                                                 title: activity.title,
                                                 description: activity.description,
                                                 type: activity.type,
                                                 data: activity.data as Prisma.InputJsonValue,
                                             })),
                                         },
+                                        algorithm: tab.workoutPlan.algorithm
+                                            ? { create: tab.workoutPlan.algorithm }
+                                            : undefined,
                                     },
                                 }
                                 : undefined,
@@ -96,8 +93,7 @@ export const databaseService = {
                     profile: true,
                     tabs: {
                         include: {
-                            algorithms: true,
-                            workoutPlan: { include: { activities: true } },
+                            workoutPlan: { include: { activities: true, algorithm: true } },
                         },
                     },
                 },
@@ -117,8 +113,7 @@ export const databaseService = {
                     goal: true,
                     tabs: {
                         include: {
-                            algorithms: true,
-                            workoutPlan: { include: { activities: true } },
+                            workoutPlan: { include: { activities: true, algorithm: true } },
                         },
                     },
                 },
@@ -139,7 +134,7 @@ export const databaseService = {
                     where: { tab: { projectId: projectId } },
                 }),
                 prisma.algorithm.deleteMany({
-                    where: { tab: { projectId: projectId } },
+                   where: { workoutPlan: { tab: { projectId: projectId } } },
                 }),
                 prisma.tab.deleteMany({
                     where: { projectId: projectId },
@@ -204,6 +199,18 @@ export const databaseService = {
     },
 
     // ----------- Goal ------------
+
+    createGoalForProject: async (projectId: string, goalStats: Prisma.InputJsonValue) => {
+        try {
+            return prisma.goal.create({
+                data: { projectId, goalStats },
+            });
+        } catch (error) {
+            console.error("Error creating goal for project:", error);
+            throw error;
+        }
+    },
+
     getGoalById: (goalId: string) => {
         try {
             return prisma.goal.findUnique({ where: { id: goalId } });
@@ -286,13 +293,6 @@ export const databaseService = {
                     projectId,
                     title: args.title,
                     type: args.type,
-                    algorithms: {
-                        create: args.algorithms.map((algorithm) => ({
-                            viewTemplate: algorithm.viewTemplate,
-                            calculationAlgorithm: algorithm.calculationAlgorithm,
-                            viewData: algorithm.viewData,
-                        })),
-                    },
                     workoutPlan: args.workoutPlan
                         ? {
                             create: {
@@ -326,9 +326,7 @@ export const databaseService = {
             return prisma.algorithm.create({
                 data: {
                     tabId,
-                    viewTemplate: algorithmInput.viewTemplate,
                     calculationAlgorithm: algorithmInput.calculationAlgorithm,
-                    viewData: algorithmInput.viewData,
                 },
             });
         } catch (error) {

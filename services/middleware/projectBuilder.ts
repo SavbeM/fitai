@@ -10,7 +10,8 @@ import {Project, User} from '@prisma/client';
 import {aiService} from '@/services/ai_module/aiService';
 import {runDynamicFunction} from "@/utils/execute_func";
 import {ActivityCandidate, GoalArray, ProfileBiometricsArray} from "@/validation/zodSchema";
-import {object_generator} from "@/utils/object_generator";
+import {generateGoalDefinition, generateProfileDefinition} from "@/utils/object_generator";
+import {ObjectGeneratorReturnType} from "@/services/ai_module/types";
 
 
 export interface BuildProject {
@@ -23,10 +24,12 @@ export class ProjectBuilder {
     private user: User | null = null;
     private project: BuildProject | null = null;
     private tabs: TabInput[] = [];
-    private goal: GoalArray | null = null;
+    private goalArray: GoalArray | null = null;
     private workoutPlan: WorkoutPlanInput | null = null;
     private activities: ActivityCandidate[] = [];
-    private profile: ProfileBiometricsArray | null = null;
+    private profileBiometricsArray: ProfileBiometricsArray | null = null;
+    private goal: ObjectGeneratorReturnType | null = null;
+    private profile: ObjectGeneratorReturnType | null = null;
 
     public async buildUser(id: string | undefined, name: string, email: string): Promise<this> {
         if (id) {
@@ -67,11 +70,11 @@ export class ProjectBuilder {
         if (!this.project) {
             throw new Error('Project must be built before adding activities.');
         }
-        if (!this.profile || !this.goal) {
+        if (!this.profileBiometricsArray || !this.goalArray) {
             throw new Error('Profile and goal must be added before adding activities.');
         }
         //Я конченный долбаеб
-        const result = await aiService.generateActivities(this.goal, this.profile, userChoice);
+        const result = await aiService.generateActivities(this.goalArray, this.profileBiometricsArray, userChoice);
         this.activities = result.activities;
         return this;
     }
@@ -92,17 +95,21 @@ export class ProjectBuilder {
         return this;
     }
 
-    public async addProfile(): Promise<this> {
+public async addProfile(fillProfile: (emptyProfile: ProfileBiometricsArray) => Promise<ProfileBiometricsArray>): Promise<this> {
         if (!this.project) {
             throw new Error('Project must be built before adding profile.');
         }
-        const result = await aiService.generateProfile(this.project.description, this.project.name);
 
-        if (!result.keys.length || !result.title || !result.types.length || !result.description ) {
+         this.profileBiometricsArray = await aiService.generateProfile(this.project.description, this.project.name);
+
+        if (!this.profileBiometricsArray || !this.profileBiometricsArray.keys.length || !this.profileBiometricsArray.types.length || !this.profileBiometricsArray.title.length || !this.profileBiometricsArray.description.length) {
             throw new Error('Profile generation failed.');
         }
 
-        this.profile = result;
+
+        this.profileBiometricsArray = await fillProfile(this.profileBiometricsArray);
+
+        this.profile = generateProfileDefinition(this.profileBiometricsArray);
 
         return this;
     }
@@ -112,18 +119,18 @@ export class ProjectBuilder {
         if (!this.project) {
             throw new Error('Project must be built before adding goal.');
         }
-        if (!this.profile) {
+        if (!this.profileBiometricsArray) {
             throw new Error('Profile must be added before adding goal.');
         }
 
 
-        const result = await aiService.generateGoal(this.project.name, this.project.description, this.profile);
+        this.goalArray = await aiService.generateGoal(this.project.name, this.project.description, this.profileBiometricsArray);
 
-        if(!result.keys.length || !result.types.length || !result.values.length) {
+        if(!this.goalArray.keys.length || !this.goalArray.types.length || !this.goalArray.values.length) {
             throw new Error("Goal generation error")
         }
 
-        this.goal = result;
+        this.goal = generateGoalDefinition(this.goalArray);
 
         return this;
 
@@ -135,21 +142,15 @@ export class ProjectBuilder {
             throw new Error('All components must be built before finalizing the project.');
         }
 
-        console.log("Profile =>", this.profile);
-        console.log("Goal =>", this.goal);
-
-        const formattedData = object_generator({profile: this.profile, goal: this.goal});
-
-        console.log("Formatted data =>", formattedData);
 
         const projectInput: CreateProjectInput = {
             ...this.project,
             profile: {
-                biometrics: formattedData.profileDefinition,
+                biometrics: this.profile,
             },
             tabs: this.tabs,
             goal: {
-                goalStats: formattedData.goalDefinition,
+                goalStats: this.goal,
             },
         }
 

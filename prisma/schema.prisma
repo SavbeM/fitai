@@ -40,7 +40,7 @@ enum EnumTabType {
 model User {
   id       String    @id @default(auto()) @map("_id") @db.ObjectId
   name     String
-  email    String   @unique
+  email    String    @unique
   projects Project[]
 }
 
@@ -66,7 +66,7 @@ model Profile {
   id         String   @id @default(auto()) @map("_id") @db.ObjectId
   biometrics Json
   project    Project? @relation(fields: [projectId], references: [id])
-  projectId  String  @unique @db.ObjectId
+  projectId  String   @unique @db.ObjectId
 }
 
 model Tab {
@@ -75,16 +75,16 @@ model Tab {
   type        EnumTabType
   projectId   String       @db.ObjectId
   project     Project      @relation(fields: [projectId], references: [id])
-  algorithms  Algorithm[]
   workoutPlan WorkoutPlan?
 }
 
 model WorkoutPlan {
-  //TODO: can be extended to include more fields
-  id         String     @id @default(auto()) @map("_id") @db.ObjectId
-  tabId      String    @unique @db.ObjectId
-  tab        Tab?       @relation(fields: [tabId], references: [id])
-  activities Activity[]
+  id           String           @id @default(auto()) @map("_id") @db.ObjectId
+  tabId        String           @unique @db.ObjectId
+  tab          Tab?             @relation(fields: [tabId], references: [id])
+  viewTemplate EnumViewTemplate
+  algorithm    Algorithm?
+  activities   Activity[]
 }
 
 model Activity {
@@ -93,17 +93,14 @@ model Activity {
   title         String
   description   String
   type          EnumActivityDataType
-  data          Json
+  data          Json?
   workoutPlan   WorkoutPlan?         @relation(fields: [workoutPlanId], references: [id])
-  workoutPlanId String              @db.ObjectId
+  workoutPlanId String               @db.ObjectId
 }
 
 model Algorithm {
-  id                   String           @id @default(auto()) @map("_id") @db.ObjectId
-  viewTemplate         EnumViewTemplate
+  id                   String      @id @default(auto()) @map("_id") @db.ObjectId
   calculationAlgorithm String
-  //viewData must provide an object of data which is used to render the view with the given template
-  viewData             Json
-  tabId                String           @db.ObjectId
-  tab                  Tab              @relation(fields: [tabId], references: [id])
+  workoutPlanId        String      @unique @db.ObjectId
+  workoutPlan          WorkoutPlan @relation(fields: [workoutPlanId], references: [id])
 }

@@ -25,12 +25,13 @@ export interface ProfileInput {
 export interface TabInput {
     title: string;
     type: EnumTabType;
-    algorithms: AlgorithmInput[];
     workoutPlan?: WorkoutPlanInput;
 }
 
 export interface WorkoutPlanInput {
     activities: ActivityInput[];
+    algorithm?: AlgorithmInput;
+    viewTemplate: EnumViewTemplate;
 }
 
 export interface ActivityInput {
@@ -48,9 +49,7 @@ export interface ActivityDataInput {
 }
 
 export interface AlgorithmInput {
-    viewTemplate: EnumViewTemplate;
     calculationAlgorithm: string;
-    viewData: object;
 }
 
 export interface GoalInput {

@@ -36,7 +36,7 @@ interface Activity {
     title: string;
     description: string;
     type: EnumActivityDataType;
-    data: ActivityDataInput; // Data input for the activity, do not modify
+    data: ActivityDataInput; // Data input for the activity, do not modify but ensure
     date: Date | string;
 }
 
@@ -114,6 +114,7 @@ Main task: You are tasked with generating keys for a user profile object in a fi
    - **types**: array of TypeScript-like data types for each key.  
    - **title**: array of user-friendly titles (strings) for each key in "values."  
    - **description**: array of brief explanations (strings) for each key, describing how it helps create or adapt the workout plan, also add metrics information example: for weight key metric is Kg.  
+   - **values**: create but keep empty
 4. **Avoid** keys that are overly complex or not directly tied to a normal fitness plan (e.g., body fat percentage if the user’s goal is unrealistic or has no standard approach).  
 
 `;

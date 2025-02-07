@@ -8,9 +8,11 @@ const customJestConfig = {
     preset: 'ts-jest',
     testEnvironment: 'node',
     moduleNameMapper: {
-        '^@/(.*)$': '<rootDir>/src/$1',
+        '^@/(.*)$': '<rootDir>/$1',
     },
     setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
+    testMatch: ['**/__tests__/**/*.test.ts'],
+    moduleFileExtensions: ['ts', 'js', 'json'],
 };
 
 module.exports = createJestConfig(customJestConfig);
