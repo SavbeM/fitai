@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "test": "jest",
-    "test-ai": "jest __tests__/aiservice.test.ts",
+    "test-ai": "jest __tests__/ai-service.test.ts",
     "lint": "next lint"
   },
   "dependencies": {
