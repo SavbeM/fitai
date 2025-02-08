@@ -15,8 +15,6 @@ import {ObjectGeneratorReturnType} from "@/utils/utilsTypes";
 import {BuildProject} from "@/services/middleware/projectInitTypes";
 
 
-
-
 export class ProjectBuilder {
     private user: User | null = null;
     private project: BuildProject | null = null;
@@ -70,7 +68,7 @@ export class ProjectBuilder {
         if (!this.profileBiometricsArray || !this.goalArray) {
             throw new Error('Profile and goal must be added before adding activities.');
         }
-        //Я конченный долбаеб
+
         const result = await aiService.generateActivities(this.goalArray, this.profileBiometricsArray, userChoice);
         this.activities = result.activities;
         return this;
