@@ -2,7 +2,7 @@ import {ObjectId} from 'bson';
 import {PrismaClient} from '@prisma/client';
 
 import {databaseService} from '@/services/databaseService';
-import {CreateProjectInput} from "@/types/databaseServiceTypes";
+import {CreateProjectInput} from "@/services/databaseServiceTypes";
 
 const prisma = new PrismaClient();
 

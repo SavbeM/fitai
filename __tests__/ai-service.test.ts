@@ -4,7 +4,7 @@ import type {
     WorkoutPlanInput,
     ProfileInput,
     GoalInput, ActivityInput,
-} from "@/types/databaseServiceTypes";
+} from "@/services/databaseServiceTypes";
 import {ActivityCandidate, AlgorithmAI, GoalArray, ProfileBiometricsArray} from "@/validation/zodSchema";
 import {object_generator} from "@/utils/object_generator";
 import {runDynamicFunction} from "@/utils/execute_func";
