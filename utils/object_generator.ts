@@ -1,5 +1,5 @@
 import {GoalArray, ProfileBiometricsArray} from "@/validation/zodSchema";
-import {ObjectGeneratorArgs, ObjectGeneratorReturnType} from "@/services/ai_module/types";
+import {ObjectGeneratorArgs, ObjectGeneratorReturnType} from "@/utils/utilsTypes";
 
 
 
