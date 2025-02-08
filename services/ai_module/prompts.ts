@@ -1,7 +1,7 @@
 // prompts.ts
 
 // Algorithm generation
-import {ActivityCandidate} from "@/validation/zodSchema";
+import {ActivityCandidate, GoalArray, ProfileBiometricsArray} from "@/validation/zodSchema";
 
 export const ALGORITHM_SYSTEM_PROMPT = `
 Main Task:
@@ -55,8 +55,8 @@ function generateWorkoutPlan(profileBiometrics: object, goalStats: object, activ
 
 export function createAlgorithmUserPrompt(
     activities: ActivityCandidate[],
-    profile: object,
-    goal: object
+    profile: ProfileBiometricsArray,
+    goal: GoalArray
 ): string {
     return JSON.stringify({activities, profile, goal});
 }
@@ -86,6 +86,14 @@ e.g. {
     -repetitive activities, check the "generatedActivities" to ensure that activity is unique.
     -Do not specify the number of sets and repetitions in the title and description, the algorithm will do this.
 `;
+
+export function createActivitiesUserPrompt(
+    goal: GoalArray,
+    profile: ProfileBiometricsArray,
+    activities: ActivityCandidate[]
+): string {
+    return JSON.stringify({goal, profile});
+}
 
 // Workout plan
 export const WORKOUT_PLAN_SYSTEM_PROMPT = `
