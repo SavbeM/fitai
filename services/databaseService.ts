@@ -1,5 +1,5 @@
 import { PrismaClient, Prisma } from '@prisma/client';
-import { AlgorithmInput, CreateProjectInput, TabInput } from "@/types/databaseServiceTypes";
+import { AlgorithmInput, CreateProjectInput, TabInput } from "@/services/databaseServiceTypes";
 
 export const prisma = new PrismaClient();
 
@@ -186,30 +186,7 @@ export const databaseService = {
         }
     },
 
-    // Новый метод для создания профиля для проекта
-    createProfileForProject: async (projectId: string, biometrics: Prisma.InputJsonValue) => {
-        try {
-            return prisma.profile.create({
-                data: { projectId, biometrics },
-            });
-        } catch (error) {
-            console.error("Error creating profile for project:", error);
-            throw error;
-        }
-    },
-
     // ----------- Goal ------------
-
-    createGoalForProject: async (projectId: string, goalStats: Prisma.InputJsonValue) => {
-        try {
-            return prisma.goal.create({
-                data: { projectId, goalStats },
-            });
-        } catch (error) {
-            console.error("Error creating goal for project:", error);
-            throw error;
-        }
-    },
 
     getGoalById: (goalId: string) => {
         try {
@@ -275,7 +252,7 @@ export const databaseService = {
     deleteTab: async (tabId: string) => {
         try {
             await prisma.$transaction([
-                prisma.algorithm.deleteMany({ where: { tabId } }),
+                prisma.algorithm.deleteMany({ where: { workoutPlan: { tabId } } }),
                 prisma.activity.deleteMany({ where: { workoutPlan: { tabId } } }),
                 prisma.workoutPlan.deleteMany({ where: { tabId } }),
                 prisma.tab.delete({ where: { id: tabId } }),
@@ -305,13 +282,13 @@ export const databaseService = {
                                         date: activity.date ? activity.date : new Date(),
                                     })),
                                 },
+                                viewTemplate: args.workoutPlan.viewTemplate,
                             },
                         }
                         : undefined,
                 },
                 include: {
-                    algorithms: true,
-                    workoutPlan: { include: { activities: true } },
+                    workoutPlan: { include: { activities: true, algorithm: true } },
                 },
             });
         } catch (error) {
@@ -321,34 +298,12 @@ export const databaseService = {
     },
 
     // ----------- Algorithm ------------
-    addAlgorithm: (tabId: string, algorithmInput: AlgorithmInput) => {
-        try {
-            return prisma.algorithm.create({
-                data: {
-                    tabId,
-                    calculationAlgorithm: algorithmInput.calculationAlgorithm,
-                },
-            });
-        } catch (error) {
-            console.error("Error adding algorithm:", error);
-            throw error;
-        }
-    },
 
     getAlgorithmById: (algorithmId: string) => {
         try {
             return prisma.algorithm.findUnique({ where: { id: algorithmId } });
         } catch (error) {
             console.error("Error getting algorithm by ID:", error);
-            throw error;
-        }
-    },
-
-    getAlgorithmsByTabId: (tabId: string) => {
-        try {
-            return prisma.algorithm.findMany({ where: { tabId } });
-        } catch (error) {
-            console.error("Error getting algorithms by tab ID:", error);
             throw error;
         }
     },

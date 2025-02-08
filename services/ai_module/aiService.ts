@@ -11,7 +11,7 @@ import {
 } from "@/validation/zodSchema";
 import OpenAI from "openai";
 
-import type {AlgorithmInput, GoalInput, ProfileInput, WorkoutPlanInput} from "@/types/databaseServiceTypes";
+import type {AlgorithmInput, GoalInput, ProfileInput, WorkoutPlanInput} from "@/services/databaseServiceTypes";
 
 
 import {
@@ -32,8 +32,8 @@ const openai = new OpenAI();
 export const aiService = {
     async generateAlgorithm(
         activities: ActivityCandidate[],
-        profile: object,
-        goal: object
+        profile: ProfileBiometricsArray,
+        goal: GoalArray
     ): Promise<AlgorithmAI> {
         const completion = await openai.beta.chat.completions.parse({
             model: "gpt-4o-2024-08-06",
@@ -60,7 +60,7 @@ export const aiService = {
         goal: GoalInput,
         profile: ProfileInput,
         algorithm: AlgorithmInput
-    ): Promise<WorkoutPlanInput> {
+    ): Promise<Omit<WorkoutPlanInput, 'viewTemplate'>> {
         const completion = await openai.beta.chat.completions.parse({
             model: "gpt-4o",
             messages: [
@@ -155,7 +155,7 @@ export const aiService = {
                         role: "system",
                         content: ACTIVITIES_SYSTEM_PROMPT
                     },
-                    { role: "user", content: JSON.stringify({ goal, profile, generatedActivities: [...declinedActivities, ...acceptedActivities] } ) },
+                    { role: "user", content: createAlgorithmUserPrompt({...declinedActivities, ...acceptedActivities}, profile, goal  ) },
                 ],
                 response_format: zodResponseFormat(activitySchema, "activity"),
             });

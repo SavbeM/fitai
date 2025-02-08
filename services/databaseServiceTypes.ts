@@ -59,13 +59,13 @@ export interface GoalInput {
 export type ProjectWithRelations = Prisma.ProjectGetPayload<{
     include: {
         profile: true;
-        projectGoal: true;
+        goal: true;
         tabs: {
             include: {
-                algorithms: true;
                 workoutPlan: {
                     include: {
                         activities: true;
+                        algorithm: true;
                     };
                 };
             };
