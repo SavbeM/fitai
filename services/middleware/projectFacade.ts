@@ -1,23 +1,6 @@
-import type { EnumTabType, EnumViewTemplate, TabInput} from '@/types/databaseServiceTypes';
-import {BuildProject, ProjectBuilder} from "@/services/middleware/projectBuilder";
-import {ActivityCandidate} from "@/validation/zodSchema";
+import {InitProjectParams} from "@/services/middleware/projectInitTypes";
+import {ProjectBuilder} from "@/services/middleware/projectBuilder";
 
-
-export interface InitProjectParams {
-    user: {
-        id?: string;
-        name: string;
-        email: string;
-    };
-project: Omit<BuildProject, "userId">;
-    initialTab: {
-        type: EnumTabType;
-        tabData: TabInput;
-    };
-    viewTemplate: EnumViewTemplate;
-    userChoice: (activityCandidate: ActivityCandidate) => Promise<boolean>;
-    fillProfile: (profileData: ProfileBiometricsArray) => Promise<ProfileBiometricsArray>;
-}
 
 export class InitProjectService {
     public async initializeNewProject(params: InitProjectParams) {

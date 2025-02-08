@@ -5,20 +5,17 @@ import type {
     EnumViewTemplate,
     TabInput,
     WorkoutPlanInput
-} from '@/types/databaseServiceTypes';
+} from '@/services/databaseServiceTypes';
 import {Project, User} from '@prisma/client';
 import {aiService} from '@/services/ai_module/aiService';
 import {runDynamicFunction} from "@/utils/execute_func";
 import {ActivityCandidate, GoalArray, ProfileBiometricsArray} from "@/validation/zodSchema";
 import {generateGoalDefinition, generateProfileDefinition} from "@/utils/object_generator";
-import {ObjectGeneratorReturnType} from "@/services/ai_module/types";
+import {ObjectGeneratorReturnType} from "@/utils/utilsTypes";
+import {BuildProject} from "@/services/middleware/projectInitTypes";
 
 
-export interface BuildProject {
-    name: string
-    description: string
-    userId: string
-}
+
 
 export class ProjectBuilder {
     private user: User | null = null;
@@ -80,11 +77,11 @@ export class ProjectBuilder {
     }
 
     public async addWorkoutPlan(viewTemplate: EnumViewTemplate): Promise<this> {
-        if (!this.project || !this.goal || !this.profile || !this.activities.length) {
+        if (!this.profileBiometricsArray || !this.goalArray  || !this.activities.length) {
             throw new Error('Project must be built before adding workout plan.');
         }
 
-        const algo = await aiService.generateAlgorithm(this.activities, this.goal, this.profile);
+        const algo = await aiService.generateAlgorithm(this.activities, this.profileBiometricsArray, this.goalArray );
         const generatedWorkoutPlan: {activities: ActivityInput[]} = runDynamicFunction(algo.calculationAlgorithm, "generateWorkoutPlan", this.profile, this.goal, this.activities);
 
         this.workoutPlan = {
