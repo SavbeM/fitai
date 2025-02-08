@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import {EnumActivityDataTypes, EnumTabTypes, EnumViewTemplates} from "@/types/databaseServiceTypes";
+import {EnumActivityDataTypes, EnumTabTypes, EnumViewTemplates} from "@/services/databaseServiceTypes";
 
 
 export const userSchema = z.object({
