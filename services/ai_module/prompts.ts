@@ -88,26 +88,11 @@ e.g. {
 `;
 
 export function createActivitiesUserPrompt(
+    activities: ActivityCandidate[],
     goal: GoalArray,
     profile: ProfileBiometricsArray,
-    activities: ActivityCandidate[]
 ): string {
     return JSON.stringify({goal, profile});
-}
-
-// Workout plan
-export const WORKOUT_PLAN_SYSTEM_PROMPT = `
-You are generating a workout plan for a fitness project 
-based on the goal, user profile, and selected algorithm.
-Return only JSON with no additional text.
-`;
-
-export function createWorkoutPlanUserPrompt(
-    goal: unknown,
-    profile: unknown,
-    algorithm: unknown
-): string {
-    return JSON.stringify({goal, profile, algorithm});
 }
 
 // Profile
