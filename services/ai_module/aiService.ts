@@ -7,23 +7,20 @@ import {
     goalSchema,
     ProfileBiometricsArray,
     profileBiometricsSchema,
-    workoutPlanSchema
 } from "@/validation/zodSchema";
 import OpenAI from "openai";
 
-import type {AlgorithmInput, GoalInput, ProfileInput, WorkoutPlanInput} from "@/services/databaseServiceTypes";
+
 
 
 import {
     ACTIVITIES_SYSTEM_PROMPT,
-    ALGORITHM_SYSTEM_PROMPT,
+    ALGORITHM_SYSTEM_PROMPT, createActivitiesUserPrompt,
     createAlgorithmUserPrompt,
     createGoalUserPrompt,
     createProfileUserPrompt,
-    createWorkoutPlanUserPrompt,
     GOAL_SYSTEM_PROMPT,
     PROFILE_SYSTEM_PROMPT,
-    WORKOUT_PLAN_SYSTEM_PROMPT
 } from "./prompts";
 
 
@@ -53,33 +50,6 @@ export const aiService = {
         } catch (e) {
             console.error("Algorithm generation error:", e);
             throw new Error("Invalid AI response format for algorithm.");
-        }
-    },
-
-    async generateWorkoutPlan(
-        goal: GoalInput,
-        profile: ProfileInput,
-        algorithm: AlgorithmInput
-    ): Promise<Omit<WorkoutPlanInput, 'viewTemplate'>> {
-        const completion = await openai.beta.chat.completions.parse({
-            model: "gpt-4o",
-            messages: [
-                { role: "system", content: WORKOUT_PLAN_SYSTEM_PROMPT },
-                { role: "user", content: createWorkoutPlanUserPrompt(goal, profile, algorithm) },
-            ],
-            temperature: 0.8,
-            response_format: zodResponseFormat(workoutPlanSchema, "workoutPlan"),
-        });
-
-        const result = completion.choices[0].message?.content;
-        if (!result) throw new Error("AI did not return a valid workout plan.");
-        try {
-            const parsed = JSON.parse(result);
-            const valid = workoutPlanSchema.parse(parsed);
-            return valid;
-        } catch (e) {
-            console.error("Workout plan generation error:", e);
-            throw new Error("Invalid AI response format for workout plan.");
         }
     },
 
@@ -155,7 +125,7 @@ export const aiService = {
                         role: "system",
                         content: ACTIVITIES_SYSTEM_PROMPT
                     },
-                    { role: "user", content: createAlgorithmUserPrompt({...declinedActivities, ...acceptedActivities}, profile, goal  ) },
+                    { role: "user", content: createActivitiesUserPrompt({...declinedActivities, ...acceptedActivities}, goal, profile ) },
                 ],
                 response_format: zodResponseFormat(activitySchema, "activity"),
             });
