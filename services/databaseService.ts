@@ -411,24 +411,6 @@ export const databaseService = {
         }
     },
 
-    addWorkoutPlan: async (projectId: string, workoutPlanData: Omit<Prisma.WorkoutPlanCreateInput, "tab">) => {
-        try {
-            const tabs = await prisma.tab.findMany({where: {projectId}});
-            if (!tabs || tabs.length === 0) {
-                throw new Error("No tabs found for project to attach a workout plan.");
-            }
-            const firstTab = tabs[0];
-            return prisma.workoutPlan.create({
-                data: {
-                    tabId: firstTab.id,
-                    ...workoutPlanData,
-                },
-            });
-        } catch (error) {
-            console.error("Error adding workout plan:", error);
-            throw error;
-        }
-    },
 
     deleteWorkoutPlan: async (workoutPlanId: string) => {
         try {
