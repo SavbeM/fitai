@@ -8,6 +8,14 @@ type TestDependencies = {
     workoutPlanId: string;
 };
 
+interface GoalStats {
+    targetWeight?: number;
+}
+
+interface BioMetrics {
+    height?: number;
+}
+
 const prisma = new PrismaClient();
 
 const createTestUser = async () => {
@@ -173,6 +181,8 @@ describe('databaseService', () => {
             // Get
             const fetchedTab = await databaseService.getTabById(newTabId);
             expect(fetchedTab?.title).toBe('New Tab');
+            const fetchedTabByProject = await databaseService.getTabsByProjectId(deps.projectId);
+            expect(fetchedTabByProject).toHaveLength(2);
 
             // Update
             const updatedTab = await databaseService.updateTabTitle(newTabId, 'Updated Tab');
@@ -202,6 +212,10 @@ describe('databaseService', () => {
         });
 
         it('should handle algorithm lifecycle', async () => {
+            //Get
+            const algorithmByWorkoutPlan = await databaseService.getAlgorithmByWorkoutPlanId(deps.workoutPlanId);
+            expect(algorithmByWorkoutPlan).not.toBeNull();
+
             // Update
             const updatedAlgorithm = await databaseService.updateAlgorithm(algorithmId, {
                 calculationAlgorithm: 'UPDATED_ALGO',
@@ -241,6 +255,8 @@ describe('databaseService', () => {
             // Get
             const fetchedActivity = await databaseService.getActivityById(activityId);
             expect(fetchedActivity?.title).toBe('Evening Yoga');
+            const activitiesByWorkoutPlanId = await databaseService.getActivitiesByWorkoutPlanId(deps.workoutPlanId);
+            expect(activitiesByWorkoutPlanId).toContainEqual(fetchedActivity);
 
             // Delete
             await databaseService.deleteActivity(activityId);
@@ -271,6 +287,70 @@ describe('databaseService', () => {
             expect(deletedPlan).toBeNull();
         });
     });
+
+    describe('Goal', () => {
+        let deps: TestDependencies;
+        let goalId: string;
+
+        beforeAll(async () => {
+            deps = await setupTestDependencies();
+            const goal = await prisma.goal.findFirst({
+                where: { projectId: deps.projectId },
+            });
+            goalId = goal?.id || '';
+        });
+
+        afterAll(async () => {
+            await cleanupTestDependencies(deps);
+        });
+
+        it('should handle goal lifecycle', async () => {
+
+            // Get
+            const goalByProject = await databaseService.getGoalByProjectId(deps.projectId);
+            expect(goalByProject).not.toBeNull();
+            expect(goalByProject?.id).toBe(goalId);
+            const goalById = await databaseService.getGoalById(goalId);
+            expect(goalById?.id).toBe(goalId);
+
+            // Update
+            const updatedGoal = await databaseService.updateGoal(goalId, { targetWeight: 65 });
+            const goalStats = updatedGoal.goalStats as GoalStats;
+            expect(goalStats.targetWeight).toBe(65);
+            expect(updatedGoal.goalStats).toBeInstanceOf(Object);
+        });
+    });
+
+    describe('Profile', () => {
+        let deps: TestDependencies;
+        let profileId: string;
+
+        beforeAll(async () => {
+            deps = await setupTestDependencies();
+            const profile = await prisma.profile.findFirst({
+                where: { projectId: deps.projectId },
+            });
+            profileId = profile?.id || '';
+        });
+
+        afterAll(async () => {
+            await cleanupTestDependencies(deps);
+        });
+
+        it('should handle profile lifecycle', async () => {
+            // Get
+            const profileByProject = await databaseService.getProfileByProjectId(deps.projectId);
+            expect(profileByProject).not.toBeNull();
+            expect(profileByProject?.id).toBe(profileId);
+            const profileById = await databaseService.getProfileById(profileId);
+            expect(profileById?.id).toBe(profileId);
+
+            // Update
+            const updatedProfile = await databaseService.updateProfile(profileId, { height: 175 });
+            const biometrics = updatedProfile.biometrics as BioMetrics;
+            expect(biometrics.height).toBe(175);
+        });
+    })
 
     describe('Error Handling', () => {
         it('should throw when creating invalid activity', async () => {
