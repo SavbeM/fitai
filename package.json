@@ -9,6 +9,7 @@
     "test": "jest",
     "test-ai": "jest __tests__/ai-service.test.ts",
     "test-db": "jest __tests__/db-service.test.ts",
+    "test-init" : "jest __tests__/init-service.test.ts",
     "lint": "next lint"
   },
   "dependencies": {
