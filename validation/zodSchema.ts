@@ -92,7 +92,7 @@ export const profileBiometricsSchema = z
     })
     .strict();
 
-export type ProfileBiometricsArray = z.infer<typeof profileBiometricsSchema>;
+export type biometricsArray = z.infer<typeof profileBiometricsSchema>;
 
 
 export const goalSchema = z
@@ -111,5 +111,8 @@ export const activitySchema = z.object({
     description: z.string(),
     type: z.enum(EnumActivityDataTypes),
 })
+
+
+export const activityCandidateArraySchema = z.array(activitySchema);
 
 export type ActivityCandidate = z.infer<typeof activitySchema>;

@@ -18,6 +18,11 @@ export interface CreateProjectInput {
     goal: GoalInput;
 }
 
+export type BiometricsData = Record<string, { type: string; title: string; description: string }>;
+
+export type GoalData = Record<string, { type: string; value: string }>;
+
+
 export interface ProfileInput {
     biometrics: Prisma.InputJsonValue;
 }

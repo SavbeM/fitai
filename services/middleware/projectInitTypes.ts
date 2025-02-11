@@ -1,5 +1,5 @@
 import type {EnumTabType, EnumViewTemplate, TabInput} from "@/services/databaseServiceTypes";
-import {ActivityCandidate, ProfileBiometricsArray} from "@/validation/zodSchema";
+
 
 export interface BuildProject {
     name: string
@@ -19,6 +19,4 @@ export interface InitProjectParams {
         tabData: TabInput;
     };
     viewTemplate: EnumViewTemplate;
-    userChoice: (activityCandidate: ActivityCandidate) => Promise<boolean>;
-    fillProfile: (profileData: ProfileBiometricsArray) => Promise<ProfileBiometricsArray>;
 }

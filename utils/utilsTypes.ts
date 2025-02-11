@@ -1,9 +1,11 @@
 import {GoalArray, ProfileBiometricsArray} from "@/validation/zodSchema";
+import {BiometricsData, GoalData} from "@/services/databaseServiceTypes";
 
 export type ObjectGeneratorReturnType = {
-    profileDefinition?: Record<string, { type: string; title: string; description: string }>;
-    goalDefinition?: Record<string, { type: string; value: string }>;
+    profileDefinition?: BiometricsData
+    goalDefinition?: GoalData
 };
+
 
 export type ObjectGeneratorArgs = {
     profile: ProfileBiometricsArray;
