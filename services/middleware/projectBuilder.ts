@@ -1,17 +1,18 @@
 import {databaseService} from '@/services/databaseService';
 import type {
     ActivityInput,
+    BiometricsData,
     CreateProjectInput,
     EnumViewTemplate,
+    GoalData,
     TabInput,
     WorkoutPlanInput
 } from '@/services/databaseServiceTypes';
 import {Project, User} from '@prisma/client';
 import {aiService} from '@/services/ai_module/aiService';
 import {runDynamicFunction} from "@/utils/execute_func";
-import {ActivityCandidate, GoalArray, ProfileBiometricsArray} from "@/validation/zodSchema";
+import {ActivityCandidate, GoalArray, biometricsArray} from "@/validation/zodSchema";
 import {generateGoalDefinition, generateProfileDefinition} from "@/utils/object_generator";
-import {ObjectGeneratorReturnType} from "@/utils/utilsTypes";
 import {BuildProject} from "@/services/middleware/projectInitTypes";
 
 
@@ -22,9 +23,9 @@ export class ProjectBuilder {
     private goalArray: GoalArray | null = null;
     private workoutPlan: WorkoutPlanInput | null = null;
     private activities: ActivityCandidate[] = [];
-    private profileBiometricsArray: ProfileBiometricsArray | null = null;
-    private goal: ObjectGeneratorReturnType | null = null;
-    private profile: ObjectGeneratorReturnType | null = null;
+    private biometricsArray: biometricsArray | null = null;
+    private goal: GoalData | null = null;
+    private biometrics: BiometricsData | null = null;
 
     public async buildUser(id: string | undefined, name: string, email: string): Promise<this> {
         if (id) {
@@ -61,26 +62,40 @@ export class ProjectBuilder {
         return this;
     }
 
-    public async addActivities(userChoice: (activityCandidate: ActivityCandidate) => Promise<boolean>): Promise<this> {
+public async createActivities(acceptedActivities?: ActivityCandidate[], declinedActivities?: ActivityCandidate[]): Promise<ActivityCandidate[]> {
+  if (!this.project) {
+            throw new Error('Project must be built before creating activities.');
+        }
+        if (!this.biometricsArray || !this.goalArray) {
+            throw new Error('Profile and goal must be added before creating activities.');
+        }
+
+
+        return await aiService.generateActivities(this.goalArray, this.biometricsArray, acceptedActivities, declinedActivities);
+    }
+
+    public addActivities(acceptedActivities: ActivityCandidate[]): this {
         if (!this.project) {
             throw new Error('Project must be built before adding activities.');
         }
-        if (!this.profileBiometricsArray || !this.goalArray) {
+        if (!this.biometricsArray || !this.goalArray) {
             throw new Error('Profile and goal must be added before adding activities.');
         }
+        if (!acceptedActivities.length) {
+            throw new Error('At least one activity must be accepted.');
+        }
 
-        const result = await aiService.generateActivities(this.goalArray, this.profileBiometricsArray, userChoice);
-        this.activities = result.activities;
+        this.activities = [...acceptedActivities];
         return this;
     }
 
     public async addWorkoutPlan(viewTemplate: EnumViewTemplate): Promise<this> {
-        if (!this.profileBiometricsArray || !this.goalArray  || !this.activities.length) {
+        if (!this.biometricsArray || !this.goalArray  || !this.activities.length) {
             throw new Error('Project must be built before adding workout plan.');
         }
 
-        const algo = await aiService.generateAlgorithm(this.activities, this.profileBiometricsArray, this.goalArray );
-        const generatedWorkoutPlan: {activities: ActivityInput[]} = runDynamicFunction(algo.calculationAlgorithm, "generateWorkoutPlan", this.profile, this.goal, this.activities);
+        const algo = await aiService.generateAlgorithm(this.activities, this.biometricsArray, this.goalArray );
+        const generatedWorkoutPlan: {activities: ActivityInput[]} = runDynamicFunction(algo.calculationAlgorithm, "generateWorkoutPlan", this.biometrics, this.goal, this.activities);
 
         this.workoutPlan = {
             activities: generatedWorkoutPlan.activities,
@@ -90,21 +105,29 @@ export class ProjectBuilder {
         return this;
     }
 
-public async addProfile(fillProfile: (emptyProfile: ProfileBiometricsArray) => Promise<ProfileBiometricsArray>): Promise<this> {
+    public async createProfileStructure(): Promise<BiometricsData> {
+        if (!this.project || !this.project.name || !this.project.description) {
+            throw new Error('Project must be built before creating profile structure.');
+        }
+
+        this.biometricsArray = await aiService.generateProfile(this.project.description, this.project.name);
+        this.biometrics = generateProfileDefinition(this.biometrics);
+
+        return this.biometrics;
+    }
+
+public  addBiometricsData(biometricsData: BiometricsData): this {
         if (!this.project) {
             throw new Error('Project must be built before adding profile.');
         }
-
-         this.profileBiometricsArray = await aiService.generateProfile(this.project.description, this.project.name);
-
-        if (!this.profileBiometricsArray || !this.profileBiometricsArray.keys.length || !this.profileBiometricsArray.types.length || !this.profileBiometricsArray.title.length || !this.profileBiometricsArray.description.length) {
-            throw new Error('Profile generation failed.');
+        if (!this.biometricsArray) {
+            throw new Error('Profile structure must be created before adding profile.');
+        }
+        if(!biometricsData) {
+            throw new Error('Biometrics data must be provided.');
         }
 
-
-        this.profileBiometricsArray = await fillProfile(this.profileBiometricsArray);
-
-        this.profile = generateProfileDefinition(this.profileBiometricsArray);
+        this.biometrics = biometricsData;
 
         return this;
     }
@@ -114,12 +137,12 @@ public async addProfile(fillProfile: (emptyProfile: ProfileBiometricsArray) => P
         if (!this.project) {
             throw new Error('Project must be built before adding goal.');
         }
-        if (!this.profileBiometricsArray) {
+        if (!this.biometricsArray) {
             throw new Error('Profile must be added before adding goal.');
         }
 
 
-        this.goalArray = await aiService.generateGoal(this.project.name, this.project.description, this.profileBiometricsArray);
+        this.goalArray = await aiService.generateGoal(this.project.name, this.project.description, this.biometricsArray);
 
         if(!this.goalArray.keys.length || !this.goalArray.types.length || !this.goalArray.values.length) {
             throw new Error("Goal generation error")
@@ -133,7 +156,7 @@ public async addProfile(fillProfile: (emptyProfile: ProfileBiometricsArray) => P
 
 
     public async build(): Promise<Project> {
-        if (!this.project || !this.user || !this.profile || !this.goal || !this.workoutPlan) {
+        if (!this.project || !this.user || !this.biometrics || !this.goal || !this.workoutPlan) {
             throw new Error('All components must be built before finalizing the project.');
         }
 
@@ -141,7 +164,7 @@ public async addProfile(fillProfile: (emptyProfile: ProfileBiometricsArray) => P
         const projectInput: CreateProjectInput = {
             ...this.project,
             profile: {
-                biometrics: this.profile,
+                biometrics: this.biometrics,
             },
             tabs: this.tabs,
             goal: {
