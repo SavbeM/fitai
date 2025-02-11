@@ -1,17 +1,14 @@
 import {zodResponseFormat} from "openai/helpers/zod";
 import {
-    ActivityCandidate,
-    activitySchema, AlgorithmAI,
-    algorithmSchema,
+    ActivityCandidate, activityCandidateArraySchema,
+    AlgorithmAI,
+    algorithmSchema, biometricsArray,
     GoalArray,
     goalSchema,
-    ProfileBiometricsArray,
+
     profileBiometricsSchema,
 } from "@/validation/zodSchema";
 import OpenAI from "openai";
-
-
-
 
 import {
     ACTIVITIES_SYSTEM_PROMPT,
@@ -29,7 +26,7 @@ const openai = new OpenAI();
 export const aiService = {
     async generateAlgorithm(
         activities: ActivityCandidate[],
-        profile: ProfileBiometricsArray,
+        profile: biometricsArray,
         goal: GoalArray
     ): Promise<AlgorithmAI> {
         const completion = await openai.beta.chat.completions.parse({
@@ -57,7 +54,7 @@ export const aiService = {
     async generateProfile(
         projectDescription: string,
         projectName: string
-    ): Promise<ProfileBiometricsArray> {
+    ): Promise<biometricsArray> {
         const completion = await openai.beta.chat.completions.parse({
             model: "gpt-4o",
             messages: [
@@ -82,7 +79,7 @@ export const aiService = {
     async generateGoal(
         projectName: string,
         projectDescription: string,
-        profile: ProfileBiometricsArray
+        profile: biometricsArray
     ): Promise<GoalArray> {
         const completion = await openai.beta.chat.completions.parse({
             model: "gpt-4o",
@@ -107,17 +104,12 @@ export const aiService = {
 
     async  generateActivities(
         goal: GoalArray,
-        profile: ProfileBiometricsArray,
-        userChoice: (activityCandidate: ActivityCandidate) => Promise<boolean>
-    ): Promise<{ activities: ActivityCandidate[] }> {
+        profile: biometricsArray,
+        acceptedActivities?: ActivityCandidate[],
+        declinedActivities?: ActivityCandidate[]
+    ): Promise<ActivityCandidate[]> {
 
-        const acceptedActivities: ActivityCandidate[] = [];
-        const declinedActivities: ActivityCandidate[] = [];
-        const maxIterations = 20;
-        let iterations = 0;
 
-        while (acceptedActivities.length < 10 && iterations < maxIterations) {
-            iterations++;
             const completion = await openai.beta.chat.completions.parse({
                 model: "gpt-4o",
                 messages: [
@@ -125,37 +117,21 @@ export const aiService = {
                         role: "system",
                         content: ACTIVITIES_SYSTEM_PROMPT
                     },
-                    { role: "user", content: createActivitiesUserPrompt({...declinedActivities, ...acceptedActivities}, goal, profile ) },
+                    { role: "user", content: createActivitiesUserPrompt(goal, profile, acceptedActivities, declinedActivities)},
                 ],
-                response_format: zodResponseFormat(activitySchema, "activity"),
+                response_format: zodResponseFormat(activityCandidateArraySchema, "activity"),
             });
 
-            const result = completion.choices[0].message?.content;
-            if (!result) {
-                console.error("No result received for candidate activity.");
-                continue;
-            }
-            let candidateActivity;
-            try {
-                candidateActivity = JSON.parse(result);
-                candidateActivity = activitySchema.parse(candidateActivity);
-            } catch (e) {
-                console.error("Error parsing candidate activity:", e);
-                continue;
-            }
-
-            const approved = await userChoice(candidateActivity);
-            if (approved) {
-                acceptedActivities.push(candidateActivity);
-            } else {
-                declinedActivities.push(candidateActivity);
-            }
+        const result = completion.choices[0].message?.content;
+        if (!result) throw new Error("AI did not return a valid goal.");
+        try {
+            const parsed = JSON.parse(result);
+            const valid = activityCandidateArraySchema.parse(parsed);
+            return valid;
+        } catch (e) {
+            console.error("Goal generation error:", e);
+            throw new Error("Invalid AI response format for goal.");
         }
 
-        if (acceptedActivities.length < 10) {
-            console.warn("Not enough activities approved. Returning available activities.");
-        }
-
-        return {activities: acceptedActivities};
     }
 };

@@ -1,7 +1,7 @@
 // prompts.ts
 
 // Algorithm generation
-import {ActivityCandidate, GoalArray, ProfileBiometricsArray} from "@/validation/zodSchema";
+import {ActivityCandidate, GoalArray, biometricsArray} from "@/validation/zodSchema";
 
 export const ALGORITHM_SYSTEM_PROMPT = `
 Main Task:
@@ -55,7 +55,7 @@ function generateWorkoutPlan(profileBiometrics: object, goalStats: object, activ
 
 export function createAlgorithmUserPrompt(
     activities: ActivityCandidate[],
-    profile: ProfileBiometricsArray,
+    profile: biometricsArray,
     goal: GoalArray
 ): string {
     return JSON.stringify({activities, profile, goal});
@@ -75,7 +75,7 @@ e.g. {
 }
 
 
-1. **Analyze** the user profile and goal.
+1. **Analyze** the user profile and goal. Utilize information about acceptedActivities and declinedActivities to match user preferences.
 2. **Generate** 
     - **title**: a string that describes the activity.
     - **description**: a string that explains the activity and how user can done this activity.
@@ -88,11 +88,12 @@ e.g. {
 `;
 
 export function createActivitiesUserPrompt(
-    activities: ActivityCandidate[],
     goal: GoalArray,
-    profile: ProfileBiometricsArray,
+    profile: biometricsArray,
+    acceptedActivities?: ActivityCandidate[],
+    declinedActivities?: ActivityCandidate[],
 ): string {
-    return JSON.stringify({goal, profile});
+    return JSON.stringify({goal, profile, acceptedActivities, declinedActivities});
 }
 
 // Profile
