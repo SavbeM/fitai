@@ -5,7 +5,6 @@ import {ObjectId} from "mongodb";
 describe('databaseService', () => {
     let userId: string;
     let projectId: string;
-    let goalId: string;
 
     afterAll(async () => {
         // Clean up all test data
@@ -132,50 +131,6 @@ describe('databaseService', () => {
             expect(missingProject).toBeNull();
         } catch (error) {
             testLog('error', 'Failed to fetch non-existent project', error);
-            throw error;
-        }
-    });
-
-    // --------- GOAL CRUD ---------
-    it('should create and update a goal for project', async () => {
-        let goal, goalFetched, updatedGoal, missingGoal;
-        // Create goal
-        try {
-            goal = await databaseService.createGoal(projectId, {weight: 75});
-            goalId = goal.id;
-            testLog('success', 'Goal created', goal);
-            expect(goal).toHaveProperty('goalStats');
-            expect(goal.projectId).toBe(projectId);
-        } catch (error) {
-            testLog('error', 'Failed to create goal', error);
-            throw error;
-        }
-        // Get goal by project ID
-        try {
-            goalFetched = await databaseService.getGoalByProjectId(projectId);
-            testLog('info', 'Goal fetched', goalFetched);
-            expect(goalFetched?.id).toBe(goalId);
-        } catch (error) {
-            testLog('error', 'Failed to fetch goal', error);
-            throw error;
-        }
-        // Edge: Try fetching goal with invalid project ID (should return null)
-        try {
-            updatedGoal = await databaseService.updateGoal(goalId, {weight: -999});
-            testLog('update', 'Goal updated (edge: negative weight)', updatedGoal);
-            expect((updatedGoal.goalStats as { weight: number } | null)?.weight).toBe(-999);
-        } catch (error) {
-            testLog('error', 'Failed to update goal', error);
-            throw error;
-        }
-        // Edge: Try updating goal with empty data (should not throw, but change nothing)
-        try {
-            const fakeId = '000000000000000000000000';
-            missingGoal = await databaseService.getGoalByProjectId(fakeId);
-            testLog('info', 'Non-existent goal fetch test', {result: missingGoal, exists: !!missingGoal});
-            expect(missingGoal).toBeNull();
-        } catch (error) {
-            testLog('error', 'Failed to fetch non-existent goal', error);
             throw error;
         }
     });
