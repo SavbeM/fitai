@@ -1,10 +1,10 @@
 import {$Enums, EnumTabType} from "@prisma/client";
 import EnumViewTemplate = $Enums.EnumViewTemplate;
-import {prisma} from "@/services/databaseService";
+import {prisma} from "@/services/database_service/databaseService";
 import {ActivityCandidate, ProfileBiometricsArray} from "@/validation/zodSchema";
 import * as readline from "node:readline";
-import {InitProjectService} from "@/services/middleware/projectFacade";
-import {InitProjectParams} from "@/services/middleware/projectInitTypes";
+import {InitProjectService} from "@/services/init_service/initProjectService";
+import {InitProjectParams} from "@/services/init_service/projectInitTypes";
 
 
 

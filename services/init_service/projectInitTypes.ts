@@ -1,4 +1,4 @@
-import type {EnumTabType, EnumViewTemplate, TabInput} from "@/services/databaseServiceTypes";
+import type {EnumTabType, EnumViewTemplate, TabInput} from "@/services/database_service/databaseServiceTypes";
 
 
 export interface BuildProject {
