@@ -114,7 +114,6 @@ export const dbMock = {
     user: testUser,
     project: testProject,
     profile: testProfile,
-    goal: testGoal,
     configTemplate: testConfigTemplate,
     workoutPlanConfig: testWorkoutPlanConfig,
     activity: testActivity,
