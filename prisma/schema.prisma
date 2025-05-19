@@ -84,24 +84,16 @@ model Project {
   title         String // Project name/title
   description   String // Project description
   userId        String       @db.ObjectId // User who owns this project
-  goal          Goal? // 1:1 relation with Goal
   profile       Profile? // 1:1 relation with Profile
   user          User         @relation(fields: [userId], references: [id]) // User who owns this project
   workoutPlan WorkoutPlan? // 1:1 relation with WorkoutPlan
-}
-
-// Target characteristics user wants to achieve for this project.
-model Goal {
-  id        String  @id @default(auto()) @map("_id") @db.ObjectId
-  goalStats Json // Desired goal stats (as JSON, e.g., {"weight": 80, "bodyfat": 12})
-  projectId String  @unique @db.ObjectId // Project this goal belongs to
-  project   Project @relation(fields: [projectId], references: [id]) // Project this goal belongs to
 }
 
 // Current user biometrics at the time of project creation.
 model Profile {
   id         String  @id @default(auto()) @map("_id") @db.ObjectId // Unique identifier
   biometrics Json // Current biometrics (e.g., {"weight": 95, "height": 180})
+  targetBiometrics Json // Target biometrics (e.g., {"weight": 85, "height": 180})
   projectId  String  @unique @db.ObjectId // Project this profile belongs to
   project    Project @relation(fields: [projectId], references: [id]) // Project this profile belongs to
 }

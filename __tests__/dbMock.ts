@@ -1,10 +1,8 @@
-
 // --- USER ---
 import {
     Activity,
     ActivityConfig,
     ConfigTemplate,
-    Goal,
     Profile,
     Project,
     User, WorkoutPlan, WorkoutPlanConfig
@@ -23,21 +21,14 @@ export const testProject: Project = {
     title: 'Fat Loss Journey',
     description: 'Cutting phase 2025',
     userId: testUser.id,
-    goal: undefined,
     profile: undefined,
-};
-
-// --- GOAL ---
-export const testGoal: Goal = {
-    id: 'goal1',
-    goalStats: { weight: 80, bodyfat: 15 },
-    projectId: testProject.id,
 };
 
 // --- PROFILE ---
 export const testProfile: Profile = {
     id: 'profile1',
     biometrics: { weight: 92, height: 180, age: 30 },
+    targetBiometrics: { weight: 80 },
     projectId: testProject.id,
 };
 

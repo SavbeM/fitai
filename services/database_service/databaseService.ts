@@ -91,24 +91,6 @@ export const databaseService = {
             data: { biometrics },
         }),
 
-    // ----- Goal -----
-    // Create goal for a project
-    createGoal: (projectId: string, goalStats: Prisma.InputJsonValue) =>
-        prisma.goal.create({
-            data: { projectId, goalStats },
-        }),
-
-    // Get goal by project ID (1:1)
-    getGoalByProjectId: (projectId: string) =>
-        prisma.goal.findUnique({ where: { projectId } }),
-
-    // Update goal stats
-    updateGoal: (goalId: string, goalStats: Prisma.InputJsonValue) =>
-        prisma.goal.update({
-            where: { id: goalId },
-            data: { goalStats },
-        }),
-
     // ----- ConfigTemplate -----
     // Get config template by ID
     getConfigTemplateById: (templateId: string) =>

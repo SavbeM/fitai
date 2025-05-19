@@ -106,19 +106,12 @@ export interface WorkoutPlan {
     activities: Activity[]; // All generated activities
 }
 
-// ----------- Goal -----------
-// Target user characteristics for the project.
-export interface Goal {
-    id: string; // Unique goal ID
-    goalStats: { [key: string]: number | string }; // Desired stats (e.g., {weight: 80})
-    projectId: string; // Linked project
-}
-
 // ----------- Profile -----------
 // User biometrics at project creation.
 export interface Profile {
     id: string; // Unique profile ID
     biometrics: { [key: string]: number | string }; // User biometric data
+    targetBiometrics: { [key: string]: number | string }; // Target values for each biometric
     projectId: string; // Linked project
 }
 
@@ -129,7 +122,6 @@ export interface Project {
     title: string; // Project name
     description: string; // Project description
     userId: string; // Project owner
-    goal?: Goal; // 1:1 relation with Goal
     profile?: Profile; // 1:1 relation with Profile
 }
 
