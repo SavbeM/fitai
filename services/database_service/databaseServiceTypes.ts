@@ -82,6 +82,7 @@ export interface Activity {
     title: string; // Short activity name
     description?: string; // Optional long description
     type: "NUMERIC" | "BOOLEAN"; // Input type
+    // Metrics are stored as numbers in the database; booleans are converted to 0/1
     targetMetric?: number | boolean; // Planned value
     completedMetric?: number | boolean; // User input/result
     unit?: string; // Measurement unit (optional)

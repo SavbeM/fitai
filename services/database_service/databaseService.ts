@@ -43,13 +43,12 @@ export const databaseService = {
             data: { userId, title, description },
         }),
 
-    // Get project by ID, include profile, goal and workout plan with activities
+    // Get project by ID, include profile and workout plan with activities
     getProjectById: (projectId: string) =>
         prisma.project.findUnique({
             where: { id: projectId },
             include: {
                 profile: true,
-                goal: true,
                 workoutPlan: { include: { activities: true } },
             },
         }),
@@ -61,13 +60,12 @@ export const databaseService = {
             data,
         }),
 
-    // Delete project with cascade: removes all related workout plans, activities, goal, profile, configs
+    // Delete project with cascade: removes all related workout plans, activities, profile, configs
     deleteProject: async (projectId: string) => {
         const plans = await prisma.workoutPlan.findMany({ where: { projectId } });
         for (const plan of plans) {
             await databaseService.deleteWorkoutPlan(plan.id);
         }
-        await prisma.goal.deleteMany({ where: { projectId } });
         await prisma.profile.deleteMany({ where: { projectId } });
         await prisma.workoutPlanConfig.deleteMany({ where: { projectId } });
         await prisma.project.delete({ where: { id: projectId } });
@@ -75,9 +73,13 @@ export const databaseService = {
 
     // ----- Profile -----
     // Create user profile for a project
-    createProfile: (projectId: string, biometrics: Prisma.InputJsonValue) =>
+    createProfile: (
+        projectId: string,
+        biometrics: Prisma.InputJsonValue,
+        targetBiometrics: Prisma.InputJsonValue,
+    ) =>
         prisma.profile.create({
-            data: { projectId, biometrics },
+            data: { projectId, biometrics, targetBiometrics },
         }),
 
     // Get profile by project ID (1:1)
@@ -85,10 +87,14 @@ export const databaseService = {
         prisma.profile.findUnique({ where: { projectId } }),
 
     // Update profile biometrics
-    updateProfile: (profileId: string, biometrics: Prisma.InputJsonValue) =>
+    updateProfile: (
+        profileId: string,
+        biometrics: Prisma.InputJsonValue,
+        targetBiometrics?: Prisma.InputJsonValue,
+    ) =>
         prisma.profile.update({
             where: { id: profileId },
-            data: { biometrics },
+            data: { biometrics, ...(targetBiometrics && { targetBiometrics }) },
         }),
 
     // ----- ConfigTemplate -----

@@ -152,7 +152,7 @@ describe('databaseService', () => {
 
         // Create profile for project
         try {
-            profile = await databaseService.createProfile(projectId, { weight: 95 });
+            profile = await databaseService.createProfile(projectId, { weight: 95 }, { weight: 85 });
             testLog('success', 'Profile created', profile);
             profileId = profile.id;
             expect(profile.projectId).toBe(projectId);
