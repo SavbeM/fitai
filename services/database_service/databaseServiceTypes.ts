@@ -123,6 +123,7 @@ export interface Project {
     description: string; // Project description
     userId: string; // Project owner
     profile?: Profile; // 1:1 relation with Profile
+    workoutPlan?: WorkoutPlan; // 1:1 relation with WorkoutPlan
 }
 
 // ----------- User -----------
