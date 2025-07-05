@@ -18,7 +18,7 @@ describe('ProjectBuilder', () => {
     it('builds project step by step', async () => {
         const builder = new ProjectBuilder(dbMock.user.id, dbMock.project.title, dbMock.project.description);
         await builder.createProject();
-        await builder.useTemplate(dbMock.configTemplate.templateId);
+        await builder.useTemplate(dbMock.configTemplate.id);
         await builder.generatePlanConfig();
         await builder.createProfile(dbMock.profile.biometrics);
         await builder.createWorkoutPlan();
@@ -38,7 +38,7 @@ describe('InitProjectService', () => {
             dbMock.user.id,
             dbMock.project.title,
             dbMock.project.description,
-            dbMock.configTemplate.templateId,
+            dbMock.configTemplate.id,
             dbMock.profile.biometrics
         );
 

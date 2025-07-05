@@ -34,7 +34,7 @@ export const testProfile: Profile = {
 
 // --- CONFIG TEMPLATE ---
 export const testConfigTemplate: ConfigTemplate = {
-    templateId: 'basic_weight_loss',
+    id: 'basic_weight_loss',
     templateName: 'Basic Weight Loss',
     description: 'For healthy fat loss with minimal muscle loss',
     goalTypes: ['weight_loss'],
@@ -72,11 +72,11 @@ export const testActivityConfig: ActivityConfig = {
 
 // --- WORKOUT PLAN CONFIG ---
 export const testWorkoutPlanConfig: WorkoutPlanConfig = {
-    configId: 'config1',
-    templateId: testConfigTemplate.templateId,
+    id: 'config1',
+    templateId: testConfigTemplate.id,
     projectId: testProject.id,
     biometrics: { weight: 92, height: 180, age: 30 },
-    goal: 'weight_loss',
+    goals: ['weight_loss'],
     activities: [testActivityConfig],
     adaptationRules: { onSkip: 'reduceTargetBy10%', onComplete: 'increaseTargetBy5%' },
     createdAt: new Date().toISOString(),
@@ -102,8 +102,8 @@ export const testWorkoutPlan: WorkoutPlan = {
     id: 'workoutplan1',
     projectId: testProject.id,
     project: testProject,
-    configTemplateId: testConfigTemplate.templateId,
-    generatedFromConfig: testWorkoutPlanConfig.configId,
+    configTemplateId: testConfigTemplate.id,
+    generatedFromConfig: testWorkoutPlanConfig.id,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     activities: [testActivity]

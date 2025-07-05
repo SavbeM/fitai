@@ -30,11 +30,11 @@ export class ProjectBuilder {
     async generatePlanConfig(): Promise<this> {
         // TODO: integrate AI module to fill config based on template and inputs
         this.context.planConfig = {
-            configId: 'mock-config',
-            templateId: this.context.template?.templateId || '',
+            id: 'mock-config',
+            templateId: this.context.template?.id || '',
             projectId: this.context.project?.id || '',
             biometrics: {},
-            goal: '',
+            goals: [],
             activities: [],
             adaptationRules: {},
             createdAt: new Date().toISOString(),
@@ -62,8 +62,8 @@ export class ProjectBuilder {
         // TODO: plug ConfigExecutor here
         this.context.workoutPlan = await databaseService.createWorkoutPlan(
             this.context.project.id,
-            this.context.template.templateId,
-            this.context.planConfig.configId
+            this.context.template.id,
+            this.context.planConfig.id
         );
         return this;
     }

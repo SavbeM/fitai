@@ -18,11 +18,11 @@ export interface ActivityConfig {
 // Filled configuration instance for a specific project.
 // Used as the basis for WorkoutPlan generation. Stores all config parameters and generated activities.
 export interface WorkoutPlanConfig {
-    configId: string; // Unique config instance ID
-    templateId: string; // Reference to ConfigTemplate
+    id: string; // Unique config instance ID
+    templateId: string; // Reference to ConfigTemplate.id
     projectId: string; // Project this config belongs to
     biometrics: { [field: string]: string | number }; // User biometric data at config generation
-    goal: string; // Target goal for this plan
+    goals: string[]; // Target goals for this plan
     activities: ActivityConfig[]; // Generated activity configs
     adaptationRules: { // Plan-level adaptation logic (from template)
         onSkip?: string;
@@ -36,7 +36,7 @@ export interface WorkoutPlanConfig {
 // Developer/admin-defined template for WorkoutPlanConfig/plan generation.
 // Specifies structure, allowed values, rules, and boundaries for safe AI-based plan creation.
 export interface ConfigTemplate {
-    templateId: string; // Unique template identifier
+    id: string; // Unique template identifier
     templateName: string; // Human-readable template name
     description: string; // Template purpose/description
     goalTypes: string[]; // Supported fitness goals (e.g., "muscle_gain")
