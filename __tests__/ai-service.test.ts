@@ -1,4 +1,4 @@
-import { aiService } from "@/services/ai_module/aiService";
+import { aiService } from "@/services/ai_service/aiService";
 import {
     ActivityCandidate,
     ProfileBiometricsArray,

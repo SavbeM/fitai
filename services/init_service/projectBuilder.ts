@@ -1,4 +1,4 @@
-import {databaseService} from '@/services/databaseService';
+import {databaseService} from '@/services/database_service/databaseService';
 import type {
     ActivityInput,
     BiometricsData,
@@ -7,13 +7,13 @@ import type {
     GoalData,
     TabInput,
     WorkoutPlanInput
-} from '@/services/databaseServiceTypes';
+} from '@/services/database_service/databaseServiceTypes';
 import {Project, User} from '@prisma/client';
-import {aiService} from '@/services/ai_module/aiService';
+import {aiService} from '@/services/ai_service/aiService';
 import {runDynamicFunction} from "@/utils/execute_func";
 import {ActivityCandidate, GoalArray, biometricsArray} from "@/validation/zodSchema";
 import {generateGoalDefinition, generateProfileDefinition} from "@/utils/object_generator";
-import {BuildProject} from "@/services/middleware/projectInitTypes";
+import {BuildProject} from "@/services/init_service/projectInitTypes";
 
 
 export class ProjectBuilder {

@@ -1,378 +1,372 @@
-import { PrismaClient } from '@prisma/client';
-import { databaseService } from '@/services/databaseService';
-
-type TestDependencies = {
-    userId: string;
-    projectId: string;
-    tabId: string;
-    workoutPlanId: string;
-};
-
-interface GoalStats {
-    targetWeight?: number;
-}
-
-interface BioMetrics {
-    height?: number;
-}
-
-const prisma = new PrismaClient();
-
-const createTestUser = async () => {
-    return await databaseService.createUser('Test User', 'test@example.com');
-};
-
-const createTestProject = async (userId: string) => {
-    return await databaseService.createProject({
-        userId,
-        name: 'Test Project',
-        description: 'Test Description',
-        profile: { biometrics: { height: 180, weight: 75 } },
-        tabs: [
-            {
-                title: 'Test Tab',
-                type: 'WORKOUT',
-                workoutPlan: {
-                    activities: [
-                        {
-                            title: 'Test Activity',
-                            description: 'Test Description',
-                            type: 'ATOMIC',
-                            data: { atomic: true },
-                            date: new Date(),
-                        },
-                    ],
-                    algorithm: { calculationAlgorithm: 'TODO_calculationAlgorithm' },
-                    viewTemplate: 'TODO',
-                },
-            },
-        ],
-        goal: { goalStats: { targetWeight: 70 } },
-    });
-};
-
-const setupTestDependencies = async (): Promise<TestDependencies> => {
-    const user = await createTestUser();
-    const project = await createTestProject(user.id);
-    const tabId = project.tabs[0].id;
-    const workoutPlan = await databaseService.getWorkoutPlanByTabId(tabId);
-
-    if (!workoutPlan) {
-        throw new Error('Workout plan not created');
-    }
-
-    return {
-        userId: user.id,
-        projectId: project.id,
-        tabId,
-        workoutPlanId: workoutPlan.id,
-    };
-};
-
-const cleanupTestDependencies = async (deps: TestDependencies) => {
-    await prisma.$transaction([
-        prisma.activity.deleteMany({ where: { workoutPlanId: deps.workoutPlanId } }),
-        prisma.algorithm.deleteMany({ where: { workoutPlanId: deps.workoutPlanId } }),
-        prisma.workoutPlan.deleteMany({ where: { id: deps.workoutPlanId } }),
-        prisma.tab.deleteMany({ where: { projectId: deps.projectId } }),
-        prisma.goal.deleteMany({ where: { projectId: deps.projectId } }),
-        prisma.profile.deleteMany({ where: { projectId: deps.projectId } }),
-        prisma.project.deleteMany({ where: { id: deps.projectId } }),
-        prisma.user.deleteMany({ where: { id: deps.userId } }),
-    ]);
-};
+import {databaseService, prisma} from "@/services/database_service/databaseService"
+import {testLog} from "@/utils/logUtil";
+import {ObjectId} from "mongodb";
 
 describe('databaseService', () => {
-    describe('User', () => {
-        let userId: string;
+    let userId: string;
+    let projectId: string;
+    let profileId: string;
+    let configTemplateId: string;
+    let workoutPlanConfigId: string;
+    let workoutPlanId: string;
 
-        afterEach(async () => {
-            if (userId) {
-                await prisma.user.deleteMany({
-                    where: { id: userId }
-                });
-            }
-        });
+    afterAll(async () => {
+        // Clean up all test data
+        await prisma.project.deleteMany({});
+        await prisma.user.deleteMany({});
+        await prisma.$disconnect();
+        console.log('🧹 Database cleaned and connection closed.');
+    });
 
-        it('should handle user lifecycle', async () => {
-            // Create
-            const user = await createTestUser();
+    // --------- USER CRUD ---------
+    it('should create, get, update and delete a user', async () => {
+        let user;
+        // Create user
+        try {
+            user = await databaseService.createUser('Test Jest', 'jestuser@test.com');
+            testLog('success', 'User created:', user);
             userId = user.id;
-            expect(user).toMatchObject({ name: 'Test User' });
+            expect(user).toHaveProperty('id');
+            expect(user.email).toBe('jestuser@test.com');
+        } catch (error: unknown) {
+            testLog('error', 'Error in create user request' + (error as Error).message);
+        }
 
-            // Get
-            const fetchedUser = await databaseService.getUserById(userId);
-            expect(fetchedUser?.id).toBe(userId);
+        // Get user by ID
+        try {
+            const userFetched = await databaseService.getUserById(userId);
+            testLog('success', 'User fetched by ID:', userFetched);
 
-            // Update
-            const updatedUser = await databaseService.updateUser(userId, 'New Name');
-            expect(updatedUser.name).toBe('New Name');
+            expect(userFetched).toBeDefined();
+            expect(userFetched?.id).toBe(userId);
+        } catch (error: unknown) {
+            testLog('error', `Error fetching user by ID: ${(error as Error).message}`);
+            throw error;
+        }
 
-            // Delete
-            await databaseService.deleteUser(userId);
-            const deletedUser = await databaseService.getUserById(userId);
-            expect(deletedUser).toBeNull();
-        });
+        // Update user
+        try {
+            const updatedUser = await databaseService.updateUser(userId, {name: 'Jest Updated'});
+            testLog('success', 'User updated with new name:', updatedUser);
+
+            expect(updatedUser.name).toBe('Jest Updated');
+        } catch (error: unknown) {
+            testLog('error', `Error updating user: ${(error as Error).message}`);
+            throw error;
+        }
+
+        // Critical: Try creating user with same email (should fail)
+        try {
+            await expect(databaseService.createUser('Another', 'jestuser@test.com'))
+                .rejects.toThrow();
+            testLog('success', 'Duplicate email test passed: creation was rejected as expected');
+        } catch (error: unknown) {
+            testLog('error', `Duplicate email test failed: ${(error as Error).message}`);
+            throw error;
+        }
+
+        // Edge: Try fetching non-existent user
+        try {
+            const fakeId = new ObjectId().toHexString();
+            const missingUser = await databaseService.getUserById(fakeId);
+            testLog('info', 'Non-existent user fetch test:', {result: missingUser, exists: !!missingUser});
+
+            expect(missingUser).toBeNull();
+        } catch (error: unknown) {
+            testLog('error', `Error in non-existent user test: ${(error as Error).message}`);
+            throw error;
+        }
     });
 
-    describe('Project', () => {
-        let deps: TestDependencies;
+    // --------- PROJECT CRUD ---------
+    it('should create, get, update and delete a project', async () => {
+        let project;
+        let projectFetched;
+        let updatedProject;
+        let updatedProject2;
+        let missingProject;
 
-        afterAll(async () => {
-            const projectExists = await prisma.project.findUnique({
-                where: { id: deps.projectId }
-            });
+        // Create project
+        try {
+            project = await databaseService.createProject(userId, 'Jest Project', 'For tests');
+            projectId = project.id;
+            testLog('success', 'Project created', project);
+            expect(project).toHaveProperty('id');
+        } catch (error) {
+            testLog('error', 'Failed to create project', error);
+            throw error;
+        }
 
-            if (projectExists) {
-                await cleanupTestDependencies(deps);
-            }
-        });
+        // Get project by ID
+        try {
+            projectFetched = await databaseService.getProjectById(projectId);
+            testLog('info', 'Project fetched', projectFetched);
+            expect(projectFetched?.id).toBe(projectId);
+        } catch (error) {
+            testLog('error', 'Failed to fetch project', error);
+            throw error;
+        }
 
-        beforeAll(async () => {
-            deps = await setupTestDependencies();
-        });
+        // Update project
+        try {
+            updatedProject = await databaseService.updateProject(projectId, {title: 'New Jest Project'});
+            testLog('update', 'Project updated', updatedProject);
+            expect(updatedProject.title).toBe('New Jest Project');
+        } catch (error) {
+            testLog('error', 'Failed to update project', error);
+            throw error;
+        }
 
+        // Edge: Update project with empty data (should not throw, but change nothing)
+        try {
+            updatedProject2 = await databaseService.updateProject(projectId, {});
+            testLog('info', 'Project updated with empty data', updatedProject2);
+            expect(updatedProject2.title).toBe('New Jest Project');
+        } catch (error) {
+            testLog('warn', 'Empty update threw an error', error);
+            throw error;
+        }
 
-        it('should handle project lifecycle', async () => {
-            // Get project
-            const project = await databaseService.getProjectById(deps.projectId);
-            expect(project?.name).toBe('Test Project');
+        // Edge: Try fetching non-existent project (should return null)
+        try {
+            const fakeId = '000000000000000000000000'; // валидный ObjectId
+            missingProject = await databaseService.getProjectById(fakeId);
+            testLog('info', 'Non-existent project fetch test', {result: missingProject, exists: !!missingProject});
+            expect(missingProject).toBeNull();
+        } catch (error) {
+            testLog('error', 'Failed to fetch non-existent project', error);
+            throw error;
+        }
+    });
 
-            // Update
-            const updatedProject = await databaseService.updateProject(
-                deps.projectId,
-                'New Name',
-                'New Description'
+    // --------- PROFILE CRUD ---------
+    it('should create, get and update a profile', async () => {
+        let profile, fetchedProfile, updatedProfile;
+
+        try {
+            profile = await databaseService.createProfile(
+                projectId,
+                { weight: 100 },
+                { weight: 90 }
             );
-            expect(updatedProject.name).toBe('New Name');
-            expect(updatedProject.description).toBe('New Description');
+            profileId = profile.id;
+            testLog('success', 'Profile created', profile);
+            expect(profile).toHaveProperty('id');
+        } catch (error) {
+            testLog('error', 'Failed to create profile', error);
+            throw error;
+        }
 
-            // Delete
-            await databaseService.deleteProject(deps.projectId);
-            const deletedProject = await databaseService.getProjectById(deps.projectId);
-            expect(deletedProject).toBeNull();
-        });
+        try {
+            fetchedProfile = await databaseService.getProfileByProjectId(projectId);
+            testLog('info', 'Profile fetched', fetchedProfile);
+            expect(fetchedProfile?.id).toBe(profileId);
+        } catch (error) {
+            testLog('error', 'Failed to fetch profile', error);
+            throw error;
+        }
+
+        try {
+            updatedProfile = await databaseService.updateProfile(profileId, { weight: 95 });
+            testLog('update', 'Profile updated', updatedProfile);
+            // biome-ignore lint/ban/ban: <see prisma Json type>
+            // @ts-ignore: partial json type
+            expect((updatedProfile.biometrics as any).weight).toBe(95);
+        } catch (error) {
+            testLog('error', 'Failed to update profile', error);
+            throw error;
+        }
     });
 
-    describe('Tab', () => {
-        let deps: TestDependencies;
-        let newTabId: string;
+    // --------- CONFIG TEMPLATE & WORKOUT PLAN CONFIG ---------
+    it('should create config template and workout plan config', async () => {
+        let template, templateFetched, templates, planConfig, configs;
 
-        beforeAll(async () => {
-            deps = await setupTestDependencies();
-        });
-
-        afterAll(async () => {
-            await cleanupTestDependencies(deps);
-        });
-
-        it('should handle tab lifecycle', async () => {
-            // Add new tab
-            const tab = await databaseService.addTab(deps.projectId, {
-                title: 'New Tab',
-                type: 'WORKOUT',
-                workoutPlan: {
-                    viewTemplate: 'TODO',
-                    activities: [],
-                },
+        try {
+            template = await prisma.configTemplate.create({
+                data: {
+                    templateId: new ObjectId().toHexString(),
+                    templateName: 'Test Template',
+                    description: 'tmp',
+                    goalTypes: ['weight_loss'],
+                    requiredBiometrics: ['weight'],
+                    activityGuidelines: { minActivities: 1, maxActivities: 5, allowedTypes: ['NUMERIC'], activityFields: [{ name: 'title', type: 'string', required: true }], },
+                    adaptationRules: {},
+                    aiPromptTemplate: 'prompt',
+                    meta: { version: '1' }
+                }
             });
-            newTabId = tab.id;
+            configTemplateId = template.templateId;
+            testLog('success', 'ConfigTemplate created', template);
+        } catch (error) {
+            testLog('error', 'Failed to create ConfigTemplate', error);
+            throw error;
+        }
 
-            // Get
-            const fetchedTab = await databaseService.getTabById(newTabId);
-            expect(fetchedTab?.title).toBe('New Tab');
-            const fetchedTabByProject = await databaseService.getTabsByProjectId(deps.projectId);
-            expect(fetchedTabByProject).toHaveLength(2);
+        try {
+            templateFetched = await databaseService.getConfigTemplateById(configTemplateId);
+            testLog('info', 'ConfigTemplate fetched', templateFetched);
+            expect(templateFetched?.templateId).toBe(configTemplateId);
+        } catch (error) {
+            testLog('error', 'Failed to fetch ConfigTemplate', error);
+            throw error;
+        }
 
-            // Update
-            const updatedTab = await databaseService.updateTabTitle(newTabId, 'Updated Tab');
-            expect(updatedTab.title).toBe('Updated Tab');
+        try {
+            templates = await databaseService.getAllConfigTemplates();
+            testLog('info', 'All templates fetched', templates.length);
+            expect(templates.some(t => t.templateId === configTemplateId)).toBe(true);
+        } catch (error) {
+            testLog('error', 'Failed to fetch templates list', error);
+            throw error;
+        }
 
-            // Delete
-            await databaseService.deleteTab(newTabId);
-            const deletedTab = await databaseService.getTabById(newTabId);
-            expect(deletedTab).toBeNull();
-        });
+        try {
+            planConfig = await databaseService.createWorkoutPlanConfig(
+                configTemplateId,
+                projectId,
+                { weight: 95 },
+                'weight_loss',
+                [{ title: 'Run', type: 'NUMERIC', targetMetric: 5, order: 1 }],
+                {},
+                { version: '1' }
+            );
+            workoutPlanConfigId = planConfig.configId;
+            testLog('success', 'WorkoutPlanConfig created', planConfig);
+        } catch (error) {
+            testLog('error', 'Failed to create WorkoutPlanConfig', error);
+            throw error;
+        }
+
+        try {
+            configs = await databaseService.getWorkoutPlanConfigsByProjectId(projectId);
+            testLog('info', 'WorkoutPlanConfigs fetched', configs);
+            expect(configs.some(c => c.configId === workoutPlanConfigId)).toBe(true);
+        } catch (error) {
+            testLog('error', 'Failed to fetch WorkoutPlanConfigs', error);
+            throw error;
+        }
     });
 
-    describe('Algorithm', () => {
-        let deps: TestDependencies;
-        let algorithmId: string;
+    // --------- ACTIVITY CRUD ---------
+    it('should create, get, update and delete activity for workout plan', async () => {
+        let workoutPlan, activity, activities, updatedActivity, afterDelete;
+        // Create activity
+        try {
+            workoutPlan = await databaseService.createWorkoutPlan(
+                projectId,
+                configTemplateId,
+                workoutPlanConfigId
+            );
+            workoutPlanId = workoutPlan.id;
+            testLog('success', 'WorkoutPlan created', workoutPlan);
+        } catch (error) {
+            testLog('error', 'Failed to create WorkoutPlan', error);
+            throw error;
+        }
 
-        beforeAll(async () => {
-            deps = await setupTestDependencies();
-            const algorithm = await prisma.algorithm.findFirst({
-                where: { workoutPlanId: deps.workoutPlanId },
-            });
-            algorithmId = algorithm?.id || '';
-        });
-
-        afterAll(async () => {
-            await cleanupTestDependencies(deps);
-        });
-
-        it('should handle algorithm lifecycle', async () => {
-            //Get
-            const algorithmByWorkoutPlan = await databaseService.getAlgorithmByWorkoutPlanId(deps.workoutPlanId);
-            expect(algorithmByWorkoutPlan).not.toBeNull();
-
-            // Update
-            const updatedAlgorithm = await databaseService.updateAlgorithm(algorithmId, {
-                calculationAlgorithm: 'UPDATED_ALGO',
-            });
-            expect(updatedAlgorithm.calculationAlgorithm).toBe('UPDATED_ALGO');
-
-            // Delete
-            await databaseService.deleteAlgorithm(algorithmId);
-            const deletedAlgorithm = await databaseService.getAlgorithmById(algorithmId);
-            expect(deletedAlgorithm).toBeNull();
-        });
-    });
-
-    describe('Activity', () => {
-        let deps: TestDependencies;
-        let activityId: string;
-
-        beforeAll(async () => {
-            deps = await setupTestDependencies();
-        });
-
-        afterAll(async () => {
-            await cleanupTestDependencies(deps);
-        });
-
-        it('should handle activity lifecycle', async () => {
-            // Add
-            const activity = await databaseService.addActivity(deps.workoutPlanId, {
-                title: 'Evening Yoga',
-                description: '30-minute session',
+        try {
+            activity = await databaseService.createActivity(workoutPlanId, {
+                title: 'Pushups',
                 type: 'NUMERIC',
-                data: { numeric: 30 },
-                date: new Date(),
+                targetMetric: 20,
+                order: 1,
+                date: new Date().toISOString(),
             });
-            activityId = activity.id;
+            testLog('success', 'Activity created', activity);
+            expect(activity).toHaveProperty('id');
+        } catch (error) {
+            testLog('error', 'Failed to create Activity', error);
+            throw error;
+        }
 
-            // Get
-            const fetchedActivity = await databaseService.getActivityById(activityId);
-            expect(fetchedActivity?.title).toBe('Evening Yoga');
-            const activitiesByWorkoutPlanId = await databaseService.getActivitiesByWorkoutPlanId(deps.workoutPlanId);
-            expect(activitiesByWorkoutPlanId).toContainEqual(fetchedActivity);
+        try {
+            activities = await databaseService.getActivitiesByWorkoutPlanId(workoutPlanId);
+            testLog('info', 'Activities fetched', activities);
+            expect(Array.isArray(activities)).toBe(true);
+            expect(activities[0].title).toBe('Pushups');
+        } catch (error) {
+            testLog('error', 'Failed to fetch Activities', error);
+            throw error;
+        }
 
-            // Delete
-            await databaseService.deleteActivity(activityId);
-            const deletedActivity = await databaseService.getActivityById(activityId);
-            expect(deletedActivity).toBeNull();
-        });
+        try {
+            updatedActivity = await databaseService.updateActivity(activity.id, {completedMetric: 99999});
+            testLog('update', 'Activity updated (extreme value)', updatedActivity);
+            expect(updatedActivity.completedMetric).toBe(99999);
+        } catch (error) {
+            testLog('error', 'Failed to update Activity', error);
+            throw error;
+        }
+
+        try {
+            await expect(databaseService.updateActivity('000000000000000000000000', {completedMetric: 1}))
+                .rejects.toThrow();
+        } catch (error) {
+            testLog('error', 'Failed to update non-existent Activity', error);
+            throw error;
+        }
+
+        try {
+            await databaseService.deleteActivity(activity.id);
+            testLog('delete', 'Activity deleted', activity.id);
+
+            afterDelete = await prisma.activity.findUnique({where: {id: activity.id}});
+            expect(afterDelete).toBeNull();
+        } catch (error) {
+            testLog('error', 'Failed to delete Activity', error);
+            throw error;
+        }
+
+        try {
+            await expect(databaseService.deleteActivity(activity.id)).rejects.toThrow();
+        } catch (error) {
+            testLog('error', 'Failed to delete already deleted Activity', error);
+            throw error;
+        }
     });
 
-    describe('WorkoutPlan', () => {
-        let deps: TestDependencies;
+    // --------- WORKOUT PLAN GET & DELETE ---------
+    it('should get workout plans by project and delete one', async () => {
+        let plans, afterDelete;
 
-        beforeAll(async () => {
-            deps = await setupTestDependencies();
-        });
+        try {
+            plans = await databaseService.getWorkoutPlansByProjectId(projectId);
+            testLog('info', 'Workout plans fetched', plans);
+            expect(plans.some(p => p.id === workoutPlanId)).toBe(true);
+        } catch (error) {
+            testLog('error', 'Failed to fetch workout plans', error);
+            throw error;
+        }
 
-        afterAll(async () => {
-            await cleanupTestDependencies(deps);
-        });
+        try {
+            await databaseService.deleteWorkoutPlan(workoutPlanId);
+            testLog('delete', 'WorkoutPlan deleted', workoutPlanId);
 
-        it('should handle workout plan operations', async () => {
-            // Get by ID
-            const plan = await databaseService.getWorkoutPlanById(deps.workoutPlanId);
-            expect(plan?.id).toBe(deps.workoutPlanId);
-
-            // Delete
-            await databaseService.deleteWorkoutPlan(deps.workoutPlanId);
-            const deletedPlan = await databaseService.getWorkoutPlanById(deps.workoutPlanId);
-            expect(deletedPlan).toBeNull();
-        });
+            afterDelete = await prisma.workoutPlan.findUnique({ where: { id: workoutPlanId } });
+            expect(afterDelete).toBeNull();
+        } catch (error) {
+            testLog('error', 'Failed to delete WorkoutPlan', error);
+            throw error;
+        }
     });
 
-    describe('Goal', () => {
-        let deps: TestDependencies;
-        let goalId: string;
+    // --------- CASCADE DELETE ---------
+    it('should delete user with all related projects (cascade)', async () => {
+        try {
+            await databaseService.deleteUser(userId);
+            testLog('delete', 'User deleted (cascade)', userId);
 
-        beforeAll(async () => {
-            deps = await setupTestDependencies();
-            const goal = await prisma.goal.findFirst({
-                where: { projectId: deps.projectId },
-            });
-            goalId = goal?.id || '';
-        });
+            const user = await prisma.user.findUnique({where: {id: userId}});
+            expect(user).toBeNull();
+            const project = await prisma.project.findUnique({where: {id: projectId}});
+            expect(project).toBeNull();
 
-        afterAll(async () => {
-            await cleanupTestDependencies(deps);
-        });
-
-        it('should handle goal lifecycle', async () => {
-
-            // Get
-            const goalByProject = await databaseService.getGoalByProjectId(deps.projectId);
-            expect(goalByProject).not.toBeNull();
-            expect(goalByProject?.id).toBe(goalId);
-            const goalById = await databaseService.getGoalById(goalId);
-            expect(goalById?.id).toBe(goalId);
-
-            // Update
-            const updatedGoal = await databaseService.updateGoal(goalId, { targetWeight: 65 });
-            const goalStats = updatedGoal.goalStats as GoalStats;
-            expect(goalStats.targetWeight).toBe(65);
-            expect(updatedGoal.goalStats).toBeInstanceOf(Object);
-        });
-    });
-
-    describe('Profile', () => {
-        let deps: TestDependencies;
-        let profileId: string;
-
-        beforeAll(async () => {
-            deps = await setupTestDependencies();
-            const profile = await prisma.profile.findFirst({
-                where: { projectId: deps.projectId },
-            });
-            profileId = profile?.id || '';
-        });
-
-        afterAll(async () => {
-            await cleanupTestDependencies(deps);
-        });
-
-        it('should handle profile lifecycle', async () => {
-            // Get
-            const profileByProject = await databaseService.getProfileByProjectId(deps.projectId);
-            expect(profileByProject).not.toBeNull();
-            expect(profileByProject?.id).toBe(profileId);
-            const profileById = await databaseService.getProfileById(profileId);
-            expect(profileById?.id).toBe(profileId);
-
-            // Update
-            const updatedProfile = await databaseService.updateProfile(profileId, { height: 175 });
-            const biometrics = updatedProfile.biometrics as BioMetrics;
-            expect(biometrics.height).toBe(175);
-        });
-    })
-
-    describe('Error Handling', () => {
-        it('should throw when creating invalid activity', async () => {
-            const deps = await setupTestDependencies();
-
-            await expect(
-                databaseService.addActivity(deps.workoutPlanId, {
-                    title: '', // Invalid empty title
-                    description: 'Test',
-                    type: 'INVALID_TYPE' as never,
-                    data: {},
-                    date: new Date(),
-                })
-            ).rejects.toThrow();
-
-            await cleanupTestDependencies(deps);
-        });
-
-        it('should throw when updating non-existent entity', async () => {
-            await expect(
-                databaseService.updateProject('non-existent-id', 'Name', 'Desc')
-            ).rejects.toThrow();
-        });
+            // Edge: Try deleting already deleted user (should throw)
+            await expect(databaseService.deleteUser(userId)).rejects.toThrow();
+        } catch (error) {
+            testLog('error', 'Cascade delete test failed', error);
+            throw error;
+        }
     });
 });

@@ -24,7 +24,9 @@ import {
 const openai = new OpenAI();
 
 export const aiService = {
+    // may be refactored in future because whole algorithm generating concept is not clear yet
     async generateAlgorithm(
+        // strange thing to use activities as input because algorithm generate activities
         activities: ActivityCandidate[],
         profile: biometricsArray,
         goal: GoalArray
@@ -102,6 +104,7 @@ export const aiService = {
         }
     },
 
+    // very stupid approach to generate activities without algorithm and otherwise
     async  generateActivities(
         goal: GoalArray,
         profile: biometricsArray,

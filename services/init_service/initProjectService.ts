@@ -1,7 +1,7 @@
-import {InitProjectParams} from "@/services/middleware/projectInitTypes";
-import {ProjectBuilder} from "@/services/middleware/projectBuilder";
+import {InitProjectParams} from "@/services/init_service/projectInitTypes";
+import {ProjectBuilder} from "@/services/init_service/projectBuilder";
 import {ActivityCandidate} from "@/validation/zodSchema";
-import {BiometricsData} from "@/services/databaseServiceTypes";
+import {BiometricsData} from "@/services/database_service/databaseServiceTypes";
 
 
 export class InitProjectService {
