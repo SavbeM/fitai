@@ -78,7 +78,7 @@ model User {
   projects Project[] // List of projects owned by this user
 }
 
-// Fitness project owned by user. Contains profile, goal, and generated workout plans.
+// Fitness project owned by user. Contains profile and generated workout plans.
 model Project {
   id            String       @id @default(auto()) @map("_id") @db.ObjectId // Unique identifier
   title         String // Project name/title
