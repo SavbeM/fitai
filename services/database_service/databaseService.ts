@@ -49,7 +49,6 @@ export const databaseService = {
             where: { id: projectId },
             include: {
                 profile: true,
-                goal: true,
                 workoutPlan: { include: { activities: true } },
             },
         }),
@@ -67,7 +66,6 @@ export const databaseService = {
         for (const plan of plans) {
             await databaseService.deleteWorkoutPlan(plan.id);
         }
-        await prisma.goal.deleteMany({ where: { projectId } });
         await prisma.profile.deleteMany({ where: { projectId } });
         await prisma.workoutPlanConfig.deleteMany({ where: { projectId } });
         await prisma.project.delete({ where: { id: projectId } });
@@ -75,9 +73,9 @@ export const databaseService = {
 
     // ----- Profile -----
     // Create user profile for a project
-    createProfile: (projectId: string, biometrics: Prisma.InputJsonValue) =>
+    createProfile: (projectId: string, biometrics: Prisma.InputJsonValue, targetBiometrics: Prisma.InputJsonValue) =>
         prisma.profile.create({
-            data: { projectId, biometrics },
+            data: { projectId, biometrics, targetBiometrics },
         }),
 
     // Get profile by project ID (1:1)
