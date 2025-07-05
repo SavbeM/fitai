@@ -5,6 +5,10 @@ import {ObjectId} from "mongodb";
 describe('databaseService', () => {
     let userId: string;
     let projectId: string;
+    let profileId: string;
+    let configTemplateId: string;
+    let workoutPlanConfigId: string;
+    let workoutPlanId: string;
 
     afterAll(async () => {
         // Clean up all test data
@@ -135,15 +139,124 @@ describe('databaseService', () => {
         }
     });
 
+    // --------- PROFILE CRUD ---------
+    it('should create, get and update a profile', async () => {
+        let profile, fetchedProfile, updatedProfile;
+
+        try {
+            profile = await databaseService.createProfile(
+                projectId,
+                { weight: 100 },
+                { weight: 90 }
+            );
+            profileId = profile.id;
+            testLog('success', 'Profile created', profile);
+            expect(profile).toHaveProperty('id');
+        } catch (error) {
+            testLog('error', 'Failed to create profile', error);
+            throw error;
+        }
+
+        try {
+            fetchedProfile = await databaseService.getProfileByProjectId(projectId);
+            testLog('info', 'Profile fetched', fetchedProfile);
+            expect(fetchedProfile?.id).toBe(profileId);
+        } catch (error) {
+            testLog('error', 'Failed to fetch profile', error);
+            throw error;
+        }
+
+        try {
+            updatedProfile = await databaseService.updateProfile(profileId, { weight: 95 });
+            testLog('update', 'Profile updated', updatedProfile);
+            // biome-ignore lint/ban/ban: <see prisma Json type>
+            // @ts-ignore: partial json type
+            expect((updatedProfile.biometrics as any).weight).toBe(95);
+        } catch (error) {
+            testLog('error', 'Failed to update profile', error);
+            throw error;
+        }
+    });
+
+    // --------- CONFIG TEMPLATE & WORKOUT PLAN CONFIG ---------
+    it('should create config template and workout plan config', async () => {
+        let template, templateFetched, templates, planConfig, configs;
+
+        try {
+            template = await prisma.configTemplate.create({
+                data: {
+                    templateId: new ObjectId().toHexString(),
+                    templateName: 'Test Template',
+                    description: 'tmp',
+                    goalTypes: ['weight_loss'],
+                    requiredBiometrics: ['weight'],
+                    activityGuidelines: { minActivities: 1, maxActivities: 5, allowedTypes: ['NUMERIC'], activityFields: [{ name: 'title', type: 'string', required: true }], },
+                    adaptationRules: {},
+                    aiPromptTemplate: 'prompt',
+                    meta: { version: '1' }
+                }
+            });
+            configTemplateId = template.templateId;
+            testLog('success', 'ConfigTemplate created', template);
+        } catch (error) {
+            testLog('error', 'Failed to create ConfigTemplate', error);
+            throw error;
+        }
+
+        try {
+            templateFetched = await databaseService.getConfigTemplateById(configTemplateId);
+            testLog('info', 'ConfigTemplate fetched', templateFetched);
+            expect(templateFetched?.templateId).toBe(configTemplateId);
+        } catch (error) {
+            testLog('error', 'Failed to fetch ConfigTemplate', error);
+            throw error;
+        }
+
+        try {
+            templates = await databaseService.getAllConfigTemplates();
+            testLog('info', 'All templates fetched', templates.length);
+            expect(templates.some(t => t.templateId === configTemplateId)).toBe(true);
+        } catch (error) {
+            testLog('error', 'Failed to fetch templates list', error);
+            throw error;
+        }
+
+        try {
+            planConfig = await databaseService.createWorkoutPlanConfig(
+                configTemplateId,
+                projectId,
+                { weight: 95 },
+                'weight_loss',
+                [{ title: 'Run', type: 'NUMERIC', targetMetric: 5, order: 1 }],
+                {},
+                { version: '1' }
+            );
+            workoutPlanConfigId = planConfig.configId;
+            testLog('success', 'WorkoutPlanConfig created', planConfig);
+        } catch (error) {
+            testLog('error', 'Failed to create WorkoutPlanConfig', error);
+            throw error;
+        }
+
+        try {
+            configs = await databaseService.getWorkoutPlanConfigsByProjectId(projectId);
+            testLog('info', 'WorkoutPlanConfigs fetched', configs);
+            expect(configs.some(c => c.configId === workoutPlanConfigId)).toBe(true);
+        } catch (error) {
+            testLog('error', 'Failed to fetch WorkoutPlanConfigs', error);
+            throw error;
+        }
+    });
+
     // --------- ACTIVITY CRUD ---------
     it('should create, get, update and delete activity for workout plan', async () => {
-        let workoutPlan, activity, activities, updatedActivity, afterDelete, workoutPlanId;
+        let workoutPlan, activity, activities, updatedActivity, afterDelete;
         // Create activity
         try {
             workoutPlan = await databaseService.createWorkoutPlan(
                 projectId,
-                'template1',
-                'config1'
+                configTemplateId,
+                workoutPlanConfigId
             );
             workoutPlanId = workoutPlan.id;
             testLog('success', 'WorkoutPlan created', workoutPlan);
@@ -209,6 +322,31 @@ describe('databaseService', () => {
             await expect(databaseService.deleteActivity(activity.id)).rejects.toThrow();
         } catch (error) {
             testLog('error', 'Failed to delete already deleted Activity', error);
+            throw error;
+        }
+    });
+
+    // --------- WORKOUT PLAN GET & DELETE ---------
+    it('should get workout plans by project and delete one', async () => {
+        let plans, afterDelete;
+
+        try {
+            plans = await databaseService.getWorkoutPlansByProjectId(projectId);
+            testLog('info', 'Workout plans fetched', plans);
+            expect(plans.some(p => p.id === workoutPlanId)).toBe(true);
+        } catch (error) {
+            testLog('error', 'Failed to fetch workout plans', error);
+            throw error;
+        }
+
+        try {
+            await databaseService.deleteWorkoutPlan(workoutPlanId);
+            testLog('delete', 'WorkoutPlan deleted', workoutPlanId);
+
+            afterDelete = await prisma.workoutPlan.findUnique({ where: { id: workoutPlanId } });
+            expect(afterDelete).toBeNull();
+        } catch (error) {
+            testLog('error', 'Failed to delete WorkoutPlan', error);
             throw error;
         }
     });
