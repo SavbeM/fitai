@@ -43,7 +43,7 @@ export const databaseService = {
             data: { userId, title, description },
         }),
 
-    // Get project by ID, include profile, goal and workout plan with activities
+    // Get project by ID, include profile and workout plan with activities
     getProjectById: (projectId: string) =>
         prisma.project.findUnique({
             where: { id: projectId },
@@ -60,7 +60,7 @@ export const databaseService = {
             data,
         }),
 
-    // Delete project with cascade: removes all related workout plans, activities, goal, profile, configs
+    // Delete project with cascade: removes all related workout plans, activities, profile, configs
     deleteProject: async (projectId: string) => {
         const plans = await prisma.workoutPlan.findMany({ where: { projectId } });
         for (const plan of plans) {
