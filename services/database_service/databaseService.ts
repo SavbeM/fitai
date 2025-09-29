@@ -104,7 +104,7 @@ export const databaseService = {
         templateId: string,
         projectId: string,
         biometrics: Prisma.InputJsonValue,
-        goals: Prisma.InputJsonValue,
+        goals: string[],
         activities: Prisma.InputJsonValue,
         adaptationRules: Prisma.InputJsonValue,
         meta?: Prisma.InputJsonValue

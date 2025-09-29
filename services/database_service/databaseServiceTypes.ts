@@ -1,5 +1,8 @@
 // ----------- ActivityConfig -----------
 // Structure for each planned activity inside WorkoutPlanConfig.
+
+import { JsonValue } from "@prisma/client/runtime/library";
+
 // Not a DB entity. Used for config and plan generation.
 export interface ActivityConfig {
     title: string; // Activity title
@@ -72,23 +75,22 @@ export interface ConfigTemplate {
     };
 }
 
+import type { Prisma } from '@prisma/client';
+
 // ----------- Activity -----------
 // Physical activity scheduled in WorkoutPlan.
 // Generated based on ActivityConfig and matches its structure.
 export interface Activity {
     id: string; // Unique activity ID
     workoutPlanId: string; // Linked WorkoutPlan
-    date: string; // Scheduled date (ISO string)
+    date: string | Date; // Scheduled date (ISO string)
     title: string; // Short activity name
-    description?: string; // Optional long description
+    description?: string | null; // Optional long description
     type: "NUMERIC" | "BOOLEAN"; // Input type
-    targetMetric?: number | boolean; // Planned value
-    completedMetric?: number | boolean; // User input/result
-    unit?: string; // Measurement unit (optional)
-    adaptationRule?: { // Runtime adaptation logic
-        onSkip?: string;
-        onComplete?: string;
-    };
+    targetMetric?: number | null; // Planned value
+    completedMetric?: number | null; // User input/result
+    unit?: string | null; // Measurement unit (optional)
+    adaptationRule?: Prisma.JsonValue | null; // Runtime adaptation logic (JSON)
     order: number; // Order in the day/plan
 }
 
@@ -101,8 +103,8 @@ export interface WorkoutPlan {
     project: Project;
     configTemplateId: string; // Source template
     generatedFromConfig: string; // Source WorkoutPlanConfig
-    createdAt: string; // Plan creation date (ISO)
-    updatedAt: string; // Plan update date (ISO)
+    createdAt: Date; // Plan creation date (ISO)
+    updatedAt: Date; // Plan update date (ISO)
     activities: Activity[]; // All generated activities
 }
 
@@ -110,8 +112,8 @@ export interface WorkoutPlan {
 // User biometrics at project creation.
 export interface Profile {
     id: string; // Unique profile ID
-    biometrics: { [key: string]: number | string }; // User biometric data
-    targetBiometrics: { [key: string]: number | string }; // Target values for each biometric
+    biometrics: { [key: string]: number | string } | JsonValue; // User biometric data
+    targetBiometrics: { [key: string]: number | string } | JsonValue; // Target values for each biometric
     projectId: string; // Linked project
 }
 
