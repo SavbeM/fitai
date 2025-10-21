@@ -185,7 +185,6 @@ describe('databaseService', () => {
         try {
             template = await prisma.configTemplate.create({
                 data: {
-                    templateId: new ObjectId().toHexString(),
                     templateName: 'Test Template',
                     description: 'tmp',
                     goalTypes: ['weight_loss'],
@@ -196,7 +195,7 @@ describe('databaseService', () => {
                     meta: { version: '1' }
                 }
             });
-            configTemplateId = template.templateId;
+            configTemplateId = template.id;
             testLog('success', 'ConfigTemplate created', template);
         } catch (error) {
             testLog('error', 'Failed to create ConfigTemplate', error);
@@ -206,7 +205,7 @@ describe('databaseService', () => {
         try {
             templateFetched = await databaseService.getConfigTemplateById(configTemplateId);
             testLog('info', 'ConfigTemplate fetched', templateFetched);
-            expect(templateFetched?.templateId).toBe(configTemplateId);
+            expect(templateFetched?.id).toBe(configTemplateId);
         } catch (error) {
             testLog('error', 'Failed to fetch ConfigTemplate', error);
             throw error;
@@ -215,7 +214,7 @@ describe('databaseService', () => {
         try {
             templates = await databaseService.getAllConfigTemplates();
             testLog('info', 'All templates fetched', templates.length);
-            expect(templates.some(t => t.templateId === configTemplateId)).toBe(true);
+            expect(templates.some(t => t.id === configTemplateId)).toBe(true);
         } catch (error) {
             testLog('error', 'Failed to fetch templates list', error);
             throw error;
@@ -226,12 +225,12 @@ describe('databaseService', () => {
                 configTemplateId,
                 projectId,
                 { weight: 95 },
-                'weight_loss',
+                ['weight_loss'],
                 [{ title: 'Run', type: 'NUMERIC', targetMetric: 5, order: 1 }],
                 {},
                 { version: '1' }
             );
-            workoutPlanConfigId = planConfig.configId;
+            workoutPlanConfigId = planConfig.id;
             testLog('success', 'WorkoutPlanConfig created', planConfig);
         } catch (error) {
             testLog('error', 'Failed to create WorkoutPlanConfig', error);
@@ -241,7 +240,7 @@ describe('databaseService', () => {
         try {
             configs = await databaseService.getWorkoutPlanConfigsByProjectId(projectId);
             testLog('info', 'WorkoutPlanConfigs fetched', configs);
-            expect(configs.some(c => c.configId === workoutPlanConfigId)).toBe(true);
+            expect(configs.some(c => c.id === workoutPlanConfigId)).toBe(true);
         } catch (error) {
             testLog('error', 'Failed to fetch WorkoutPlanConfigs', error);
             throw error;

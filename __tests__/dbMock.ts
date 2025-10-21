@@ -9,17 +9,17 @@ import {
 } from "@/services/database_service/databaseServiceTypes";
 
 export const testUser: User = {
-    id: 'user1',
-    name: 'Test User',
+    id: new Date().toISOString(),
+    name: 'Mark Selikhov',
     email: 'testuser@example.com',
     projects: [],
 };
 
 // --- PROJECT ---
 export const testProject: Project = {
-    id: 'project1',
-    title: 'Fat Loss Journey',
-    description: 'Cutting phase 2025',
+    id: new Date().toISOString(),
+    title: 'Run a marathon',
+    description: 'Run a marathon 40 km',
     userId: testUser.id,
     profile: undefined,
 };
@@ -34,10 +34,10 @@ export const testProfile: Profile = {
 
 // --- CONFIG TEMPLATE ---
 export const testConfigTemplate: ConfigTemplate = {
-    templateId: 'basic_weight_loss',
-    templateName: 'Basic Weight Loss',
-    description: 'For healthy fat loss with minimal muscle loss',
-    goalTypes: ['weight_loss'],
+    id: 'basic_running_template',
+    templateName: 'Basic Running Plan',
+    description: 'Running-focused plan for weight loss',
+    goalTypes: ['weight_loss', 'stamina'],
     requiredBiometrics: ['weight', 'height', 'age'],
     activityGuidelines: {
         minActivities: 3,
@@ -56,7 +56,7 @@ export const testConfigTemplate: ConfigTemplate = {
         onSkip: 'reduceTargetBy10%',
         onComplete: 'increaseTargetBy5%',
     },
-    aiPromptTemplate: 'Generate up to {maxActivities} weight loss activities...',
+    aiPromptTemplate: 'Generate up to {maxActivities} running weight loss activities...',
     meta: { author: 'TestBot', version: 'v1.0' }
 };
 
@@ -72,11 +72,11 @@ export const testActivityConfig: ActivityConfig = {
 
 // --- WORKOUT PLAN CONFIG ---
 export const testWorkoutPlanConfig: WorkoutPlanConfig = {
-    configId: 'config1',
-    templateId: testConfigTemplate.templateId,
+    id: 'config1',
+    templateId: testConfigTemplate.id,
     projectId: testProject.id,
     biometrics: { weight: 92, height: 180, age: 30 },
-    goal: 'weight_loss',
+    goals: ['weight_loss'],
     activities: [testActivityConfig],
     adaptationRules: { onSkip: 'reduceTargetBy10%', onComplete: 'increaseTargetBy5%' },
     createdAt: new Date().toISOString(),
@@ -102,10 +102,10 @@ export const testWorkoutPlan: WorkoutPlan = {
     id: 'workoutplan1',
     projectId: testProject.id,
     project: testProject,
-    configTemplateId: testConfigTemplate.templateId,
-    generatedFromConfig: testWorkoutPlanConfig.configId,
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    configTemplateId: testConfigTemplate.id,
+    generatedFromConfig: testWorkoutPlanConfig.id,
+    createdAt: new Date(),
+    updatedAt: new Date(),
     activities: [testActivity]
 };
 

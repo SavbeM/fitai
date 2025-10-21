@@ -92,7 +92,7 @@ export const databaseService = {
     // ----- ConfigTemplate -----
     // Get config template by ID
     getConfigTemplateById: (templateId: string) =>
-        prisma.configTemplate.findUnique({ where: { templateId } }),
+        prisma.configTemplate.findUnique({ where: { id: templateId } }),
 
     // Get all config templates
     getAllConfigTemplates: () =>
@@ -104,13 +104,13 @@ export const databaseService = {
         templateId: string,
         projectId: string,
         biometrics: Prisma.InputJsonValue,
-        goal: string,
+        goals: string[],
         activities: Prisma.InputJsonValue,
         adaptationRules: Prisma.InputJsonValue,
         meta?: Prisma.InputJsonValue
     ) =>
         prisma.workoutPlanConfig.create({
-            data: { templateId, projectId, biometrics, goal, activities, adaptationRules, meta },
+            data: { templateId, projectId, biometrics, goals, activities, adaptationRules, meta },
         }),
 
     // Get all WorkoutPlanConfigs for a project
