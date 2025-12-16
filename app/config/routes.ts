@@ -1,0 +1,1 @@
+export const HEADER_NAV_LINKS: Record<string, string> = { Home: '/', Projects: '/projects', Login: '/', Register: '/' };

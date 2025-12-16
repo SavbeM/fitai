@@ -74,6 +74,7 @@ model User {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   projects  Project[]
+
 }
 
 /// Project: represents a user-defined goal and links to one WorkoutPlan.
@@ -91,9 +92,9 @@ model Project {
 
   /// Link to generated WorkoutPlan.
   workoutPlanId String?      @unique @db.ObjectId
-  workoutPlan   WorkoutPlan? @relation(fields: [workoutPlanId], references: [id])
+  WorkoutPlan WorkoutPlan?
   /// Relation to User
-  user          User         @relation(fields: [userId], references: [id])
+  user          User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -129,6 +130,7 @@ model Exercise {
   loadMetrics Metric[]
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
+  /// Relation to scheduled activities using this exercise.
   activities  Activity[]
 
   @@index([title])
@@ -139,11 +141,11 @@ model WorkoutPlan {
   id             String         @id @default(auto()) @map("_id") @db.ObjectId
   /// Link to the project this plan is for.
   projectId      String         @db.ObjectId
-  project        Project?
+  project        Project       @relation(fields: [projectId], references: [id], onDelete: Cascade)
   /// Link to the configuration template used to generate this plan.
   configTemplate ConfigTemplate @relation(fields: [templateId], references: [id])
   templateId     String         @db.ObjectId
-  /// Scheduled activities in this workout plan.
+  /// Relation to array of scheduled activities in this workout plan.
   activities     Activity[]
 
   createdAt DateTime @default(now())
