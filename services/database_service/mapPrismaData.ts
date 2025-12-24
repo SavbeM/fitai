@@ -65,6 +65,7 @@ export type RawConfigTemplateCreateDTO = {
         frequency_per_week: number;
         required_exercise_ids: string[];
     };
+    recommendedExerciseIds: string[];
 };
 
 export type RawConfigTemplateUpdateDTO = Partial<{
@@ -77,6 +78,8 @@ export type RawConfigTemplateUpdateDTO = Partial<{
         frequency_per_week: number;
         required_exercise_ids: string[];
     };
+    exerciseIdsToAdd?: string[];
+    exerciseIdsToRemove?: string[];
 }>;
 
 /** Exercise */
@@ -193,8 +196,14 @@ export function mapToPrismaData<
 
         case "ConfigTemplate": {
             if (action === "create") {
-                const { templateName, tags, description, requiredTargetMetrics, activityGuidelines } =
-                    data as RawConfigTemplateCreateDTO;
+                const {
+                    templateName,
+                    tags,
+                    description,
+                    requiredTargetMetrics,
+                    activityGuidelines,
+                    recommendedExerciseIds,
+                } = data as RawConfigTemplateCreateDTO;
 
                 const prismaData: Prisma.ConfigTemplateCreateInput = {
                     templateName,
@@ -202,13 +211,27 @@ export function mapToPrismaData<
                     description,
                     requiredTargetMetrics,
                     activityGuidelines,
+                    recommendedExercises: recommendedExerciseIds?.length
+                        ? {
+                              create: recommendedExerciseIds.map((exerciseId) => ({
+                                  exercise: { connect: { id: exerciseId } },
+                              })),
+                          }
+                        : undefined,
                 };
                 return prismaData as EntityToInputMap[E][A];
             }
 
             if (action === "update") {
-                const { templateName, tags, description, requiredTargetMetrics, activityGuidelines } =
-                    data as RawConfigTemplateUpdateDTO;
+                const {
+                    templateName,
+                    tags,
+                    description,
+                    requiredTargetMetrics,
+                    activityGuidelines,
+                    exerciseIdsToAdd,
+                    exerciseIdsToRemove,
+                } = data as RawConfigTemplateUpdateDTO;
 
                 const prismaData: Prisma.ConfigTemplateUpdateInput = {
                     templateName,
@@ -216,6 +239,26 @@ export function mapToPrismaData<
                     description,
                     requiredTargetMetrics,
                     activityGuidelines,
+                    ...(exerciseIdsToAdd?.length || exerciseIdsToRemove?.length
+                        ? {
+                              recommendedExercises: {
+                                  ...(exerciseIdsToAdd?.length
+                                      ? {
+                                            create: exerciseIdsToAdd.map((exerciseId) => ({
+                                                exercise: { connect: { id: exerciseId } },
+                                            })),
+                                        }
+                                      : {}),
+                                  ...(exerciseIdsToRemove?.length
+                                      ? {
+                                            deleteMany: {
+                                                exerciseId: { in: exerciseIdsToRemove },
+                                            },
+                                        }
+                                      : {}),
+                              },
+                          }
+                        : {}),
                 };
                 return prismaData as EntityToInputMap[E][A];
             }

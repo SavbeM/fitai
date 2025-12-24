@@ -62,6 +62,21 @@ type MetricValue {
   value  Float
 }
 
+/// Join table for recommended exercises in a config template.
+/// Explicit model is used to ensure consistency + allow future metadata (ordering, etc.).
+model ConfigTemplateRecommendedExercise {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  templateId String @db.ObjectId
+  exerciseId String @db.ObjectId
+
+  template ConfigTemplate @relation(fields: [templateId], references: [id])
+  exercise Exercise       @relation(fields: [exerciseId], references: [id])
+
+  @@unique([templateId, exerciseId])
+  @@index([templateId])
+  @@index([exerciseId])
+}
+
 // -----------------------------
 // MODELS
 // -----------------------------
@@ -116,6 +131,9 @@ model ConfigTemplate {
   createdAt             DateTime           @default(now())
   updatedAt             DateTime           @updatedAt
   WorkoutPlan           WorkoutPlan[]
+
+  /// Recommended exercises for this template (many-to-many via join model).
+  recommendedExercises ConfigTemplateRecommendedExercise[]
 }
 
 /// Global exercise definition (no load here).
@@ -132,6 +150,9 @@ model Exercise {
   /// Relation to scheduled activities using this exercise.
   activities  Activity[]
 
+  /// Config templates that recommend this exercise (many-to-many via join model).
+  recommendedByTemplates ConfigTemplateRecommendedExercise[]
+
   @@index([title])
 }
 
@@ -146,9 +167,8 @@ model WorkoutPlan {
   templateId     String         @db.ObjectId
   /// Relation to array of scheduled activities in this workout plan.
   activities     Activity[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
 
   @@unique([projectId])
   @@index([templateId])
@@ -171,9 +191,8 @@ model Activity {
   status        ActivityStatus @default(PLANNED)
   /// Actual load recorded after completion.
   actual_load   MetricValue[]
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
 
   @@index([workoutPlanId])
   @@index([exerciseId])

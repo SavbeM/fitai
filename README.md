@@ -48,9 +48,9 @@ Core entities:
 - `Exercise`
 - `Activity` (belongs to `WorkoutPlan`, references `Exercise`)
 
-Notable embedded types:
-- `Metric`, `MetricValue`
-- `ActivityGuidelines`
+Relations / notes:
+- `ConfigTemplate` ↔ `Exercise` is implemented as a join collection/model: `ConfigTemplateRecommendedExercise`.
+  - This matters for cleanup in tests and for template updates (adding/removing recommended exercises).
 
 Enums:
 - `ExerciseType` (`NUMERIC`, `BOOLEAN`)
@@ -142,10 +142,13 @@ npm run dev
 Provides CRUD helpers for:
 - User
 - Project
-- ConfigTemplate (read-only helpers exist)
+- ConfigTemplate (includes helpers + recommended-exercises management)
 - WorkoutPlan
 - Activity
 - Exercise
+
+Notes:
+- `createWorkoutPlan` takes a DTO: `{ projectId, templateId, activityIds? }`.
 
 Mapping between raw DTOs and Prisma inputs lives in:
 - `services/database_service/mapPrismaData.ts`

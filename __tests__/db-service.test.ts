@@ -38,6 +38,15 @@ const hasDatabase = Boolean(process.env.DATABASE_URL);
         // Delete in dependency order.
         await prisma.activity.deleteMany({ where: { id: { in: createdIds.activityIds } } });
         await prisma.workoutPlan.deleteMany({ where: { id: { in: createdIds.workoutPlanIds } } });
+
+        // Join table cleanup (template <-> exercise) to avoid orphans in Mongo.
+        await prisma.configTemplateRecommendedExercise.deleteMany({
+            where: { templateId: { in: createdIds.templateIds } },
+        });
+        await prisma.configTemplateRecommendedExercise.deleteMany({
+            where: { exerciseId: { in: createdIds.exerciseIds } },
+        });
+
         await prisma.exercise.deleteMany({ where: { id: { in: createdIds.exerciseIds } } });
         await prisma.project.deleteMany({ where: { id: { in: createdIds.projectIds } } });
         await prisma.user.deleteMany({ where: { id: { in: createdIds.userIds } } });
@@ -248,7 +257,10 @@ const hasDatabase = Boolean(process.env.DATABASE_URL);
             });
             const exercise = await createExerciseFixture();
 
-            const plan = await databaseService.createWorkoutPlan(project.id, template.id);
+            const plan = await databaseService.createWorkoutPlan({
+                projectId: project.id,
+                templateId: template.id,
+            });
             expect(plan).toHaveProperty("id");
             track.workoutPlan(plan.id);
 
