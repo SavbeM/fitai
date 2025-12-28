@@ -127,10 +127,10 @@ npm run dev
 - `GET /api/create-profile-structure`
   - Calls an init/middleware service to return a profile structure.
 
-- `app/api/create-activities/route.ts`
+- `app/api/create-activities/socket.ts`
   - Currently empty (placeholder).
 
-- `app/api/user/route.ts`
+- `app/api/user/socket.ts`
   - Legacy-style handler (Pages Router style). This likely needs migration to App Router route handlers.
 
 ---
