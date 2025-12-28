@@ -30,9 +30,124 @@ This repo is currently a **work-in-progress**: the UI contains mock project data
 - `services/`
   - `services/ai_service/aiService.ts` — OpenAI-backed generation (profile, goals, activities, algorithm)
   - `services/database_service/` — Prisma-backed persistence + mapping helpers
-  - `services/init_service/` — orchestration for project initialization (builder pattern; partially mocked)
+  - `services/init_service/` — orchestration for project initialization (builder pattern; WIP)
 - `prisma/schema.prisma` — MongoDB schema
 - `__tests__/` — Jest tests (includes reusable DB acceptance tests)
+
+---
+
+## Init flow (WIP): ProjectBuilder + InitProjectService
+
+Project initialization is implemented as a **step-based orchestration**. The goal is to execute several steps and be able to stream intermediate progress to the client.
+
+Current implementation is the **first step only**:
+
+- `services/init_service/projectBuilder.ts`
+  - `createProject()`
+    - Persists a new `Project` in DB using `databaseService.createProject()`
+    - Saves created project into internal builder context
+    - Returns a `ProjectBuilderResponse` in a standard format:
+      - `{ step, success, message }`
+
+- `services/init_service/initProjectService.ts`
+  - `initProject(userId, title, description, callback)`
+    - Creates a `ProjectBuilder`
+    - Executes `builder.createProject()`
+    - Calls `callback(stepResponse)` so API layer can stream this step result
+
+Validation of input payloads is done with Zod in:
+- `lib/validation-schema-zod.ts`
+
+---
+
+## API routes
+
+> Some routes are still evolving.
+
+### WebSocket: Create project (init step 1)
+
+**Route:** `GET /api/create-project` (WebSocket upgrade)
+
+This endpoint is implemented as a WebSocket route handler via `next-ws`:
+- file: `app/api/create-project/route.ts`
+- runtime: `nodejs`
+
+**Non-WS request behavior**:
+- `GET /api/create-project` returns `426 Upgrade Required` and sets:
+  - `Connection: Upgrade`
+  - `Upgrade: websocket`
+
+#### Client → Server message
+
+The server expects JSON that matches `ClientMessageSchema`:
+
+- `type` is a literal: `"create-project"`
+- `payload`:
+  - `userId: string`
+  - `title: string`
+  - `description: string`
+
+Example:
+
+```json
+{
+  "type": "create-project",
+  "payload": {
+    "userId": "507f191e810c19729de860ea",
+    "title": "Lose 5kg in 2 months",
+    "description": "Need a plan for home workouts 3x/week"
+  }
+}
+```
+
+#### Server → Client messages
+
+The server sends `ServerMessage` messages:
+- `{ "type": "hello" }` — immediately after connect
+- `{ "type": "step", "payload": { "step": "CREATE_PROJECT", "success": true, "message": "..." } }` — per step
+- `{ "type": "error", "payload": { "message": "..." } }` — parsing/validation/runtime error
+
+#### How to test
+
+**Postman**
+1. Create **WebSocket Request** (not HTTP request)
+2. Connect to: `ws://localhost:3000/api/create-project`
+3. Send the JSON payload from the example above
+
+If Postman shows `socket hang up`, validate the endpoint using a Node client (below). Postman can be flaky with WS extensions/compression.
+
+**Node.js (ws) quick test**
+
+```bash
+node - <<'NODE'
+const WebSocket = require('ws');
+const ws = new WebSocket('ws://localhost:3000/api/create-project');
+ws.on('open', () => {
+  console.log('open');
+  ws.send(JSON.stringify({
+    type: 'create-project',
+    payload: {
+      userId: '507f191e810c19729de860ea',
+      title: 'Test title',
+      description: 'Test description'
+    }
+  }));
+});
+ws.on('message', (m) => console.log('message', m.toString()));
+ws.on('error', (e) => console.error('error', e));
+NODE
+```
+
+### Other routes (legacy/WIP)
+
+- `GET /api/create-profile-structure`
+  - Calls an init/middleware service to return a profile structure.
+
+- `app/api/create-activities/socket.ts`
+  - Currently empty (placeholder).
+
+- `app/api/user/socket.ts`
+  - Legacy-style handler (Pages Router style). This likely needs migration to App Router route handlers.
 
 ---
 
@@ -120,21 +235,6 @@ npm run dev
 
 ---
 
-## API routes
-
-> Some routes are still evolving.
-
-- `GET /api/create-profile-structure`
-  - Calls an init/middleware service to return a profile structure.
-
-- `app/api/create-activities/socket.ts`
-  - Currently empty (placeholder).
-
-- `app/api/user/socket.ts`
-  - Legacy-style handler (Pages Router style). This likely needs migration to App Router route handlers.
-
----
-
 ## Database service
 
 `services/database_service/databaseService.ts`
@@ -159,6 +259,11 @@ Mapping between raw DTOs and Prisma inputs lives in:
 
 ### Unit/placeholder tests
 - `__tests__/ai-service.test.ts` — currently a placeholder
+
+### Init service (unit tests)
+- `__tests__/init-service.test.ts`
+  - covers `ProjectBuilder.createProject()`
+  - covers `InitProjectService.initProject()`
 
 ### Database acceptance tests (recommended)
 - `__tests__/db-service.test.ts`
