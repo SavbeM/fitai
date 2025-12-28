@@ -1,25 +1,39 @@
-// Types used by project initialization workflow
+import {Project} from "@prisma/client";
 
-import { Project, ConfigTemplate, WorkoutPlanConfig, Profile, WorkoutPlan } from '@/services/database_service/databaseServiceTypes';
-import {  ConfigTemplate as DbConfigTemplate } from '@prisma/client';
+export interface ProjectBuilderParams {
+    userId: string;
+    title: string;
+    description: string;
+}
 
-// Context object passed around builder methods
-export interface ProjectBuildContext {
+export interface ProjectBuilderContext {
     userId: string;
     title: string;
     description: string;
     project?: Project;
-    template?: ConfigTemplate | DbConfigTemplate | null;
-    planConfig?: WorkoutPlanConfig | null;
-    profile?: Profile | null;
-    workoutPlan?: WorkoutPlan | null;
 }
 
-// Result returned to callers after initialization
-export interface ProjectBuildResult {
-    project: Project | undefined;
-    profile?: Profile | null;
-    template?: ConfigTemplate | DbConfigTemplate | null;
-    planConfig?: WorkoutPlanConfig | null;
-    workoutPlan?: WorkoutPlan | null;
+
+export const StepName = {
+    CREATE_PROJECT: "createProject",
+} as const;
+
+export type StepNameType = (typeof StepName)[keyof typeof StepName];
+
+export interface ProjectBuilderResponse{
+    message: string;
+    success: boolean;
+    step: StepNameType;
 }
+
+export interface ProjectBuilderResult{
+    ok: boolean;
+    project: Project;
+}
+
+
+export type ServerMessage =
+    | { type: "hello" }
+    | { type: "step"; payload: ProjectBuilderResponse }
+    | { type: "done"; payload: ProjectBuilderResult }
+    | { type: "error"; payload: {message: string} };
