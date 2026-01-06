@@ -7,7 +7,7 @@ jest.mock("@/services/database_service/databaseService", () => {
     databaseService: {
       createProject: jest.fn(),
     },
-  };
+  }
 });
 
 // Mock InitProjectService when testing the API route (we don't want DB/Builder there)

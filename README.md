@@ -1,8 +1,7 @@
 # FIT AI — AI‑powered fitness coach
 
 FIT AI is a Next.js app that uses AI (OpenAI) + Prisma (MongoDB) to help users:
-- create fitness projects (goal + description)
-- generate a profile structure / biometrics schema
+- create fitness projects 
 - generate a workout plan (WorkoutPlan + Activities)
 - track activities and progress over time
 
@@ -28,11 +27,97 @@ This repo is currently a **work-in-progress**: the UI contains mock project data
   - `app/(pages)/projects/page.tsx` — projects UI (currently mocked)
   - `app/api/*` — API routes
 - `services/`
-  - `services/ai_service/aiService.ts` — OpenAI-backed generation (profile, goals, activities, algorithm)
+  - `services/ai_service/` — OpenAI-backed semantic search and template selection
   - `services/database_service/` — Prisma-backed persistence + mapping helpers
   - `services/init_service/` — orchestration for project initialization (builder pattern; WIP)
+  - `services/search_service/` — search service for finding relevant ConfigTemplates
 - `prisma/schema.prisma` — MongoDB schema
 - `__tests__/` — Jest tests (includes reusable DB acceptance tests)
+
+---
+
+## AI Service (`services/ai_service/`)
+
+The AI service provides intelligent template selection using OpenAI. It implements a RAG-ish (Retrieval Augmented Generation) approach.
+
+### Module Structure
+
+| File | Description |
+|------|-------------|
+| `semantic_search.ts` | Main entry point. Fetches candidates from DB, sends to OpenAI, validates response. |
+| `prompts.ts` | System and user prompt templates for OpenAI chat completions. |
+| `AIServiceTypes.ts` | TypeScript types and Zod schemas for input/output validation. |
+
+### How It Works
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  User Input     │───▶│  Fetch DB       │───▶│  OpenAI API     │
+│  title + desc   │    │  Candidates     │    │  (gpt-5-nano)  │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                                      │
+                       ┌─────────────────┐            │
+                       │  Zod Validate   │◀───────────┘
+                       │  + Guard Check  │
+                       └─────────────────┘
+                               │
+                       ┌─────────────────┐
+                       │  AiTemplatePick │
+                       │  (result)       │
+                       └─────────────────┘
+```
+
+1. **Validate input** — Zod schema ensures title/description are non-empty strings.
+2. **Fetch candidates** — Retrieves ConfigTemplates from MongoDB (limited by `candidateLimit`).
+3. **Build prompt** — Creates structured prompt with project info and candidate list.
+4. **Call OpenAI** — Uses `gpt-5-nano` with JSON response mode (temperature=0).
+5. **Validate response** — Zod schema validates AI response structure.
+6. **Guard check** — Ensures picked `templateId` exists in candidate list (prevents hallucination).
+
+### Types & Schemas
+
+#### `SemanticSearchInput` (Input DTO)
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `title` | `string` | ✅ | Short project goal (e.g., "Bench press strength"). |
+| `description` | `string` | ✅ | Detailed project description with user intent. |
+| `candidateLimit` | `number` | ❌ | Max templates to pass to AI (1–200, default ~30). |
+
+#### `AiTemplatePick` (Output DTO)
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `status` | `"ok" \| "not_found" \| "inconsistent"` | Selection outcome. |
+| `templateId` | `string?` | Selected ConfigTemplate ID (only when status is "ok"). |
+| `confidence` | `number?` | Model confidence score (0–1). |
+| `reason` | `string?` | Human-readable explanation. |
+
+### Usage Example
+
+```ts
+import { semanticSearchConfigTemplate } from "@/services/ai_service/semantic_search";
+
+const result = await semanticSearchConfigTemplate({
+  title: "Bench press strength",
+  description: "I want to increase my 1RM bench press",
+  candidateLimit: 20,
+});
+
+if (result.status === "ok") {
+  console.log("Best template:", result.templateId);
+  console.log("Confidence:", result.confidence);
+} else {
+  console.log("No match:", result.reason);
+}
+```
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENAI_API_KEY` | ✅ | OpenAI API key for chat completions. |
+| `DATABASE_URL` | ✅ | MongoDB connection string (for fetching candidates). |
 
 ---
 
@@ -218,7 +303,7 @@ cp .env.example .env
 
 ```bash
 DATABASE_URL="mongodb+srv://.../fitai?..."
-OPENAI_API_KEY="..." # optional unless calling aiService or API routes that use it
+OPENAI_API_KEY="..." # optional unless calling semantic_search or API routes that use it
 ```
 
 4) Generate Prisma client
@@ -255,10 +340,89 @@ Mapping between raw DTOs and Prisma inputs lives in:
 
 ---
 
+## Search service (Atlas Search + extensible strategies)
+
+`services/search_service/`
+
+This module provides an **extensible search layer** for selecting the most relevant `ConfigTemplate`.
+
+### What it does today
+
+- Runs **MongoDB Atlas Search** against the `ConfigTemplate` collection.
+- Match logic (current contract):
+  - searches **`ConfigTemplate.tags`** using the user-provided project **`title`**
+  - searches **`ConfigTemplate.description`** using the user-provided project **`description`**
+
+Entry point:
+- `SearchService.searchConfigTemplates(input)`
+
+### Input / Output contract
+
+**Input** (`TemplateSearchInput`):
+- `title: string` (required)
+- `description: string` (required)
+
+**Output** (`TemplateSearchResult`):
+- `hits`: array of `{ templateId, score?, highlights? }`
+- `meta`: `{ strategy, indexName, executionMs? }`
+
+### Atlas Search requirements
+
+The Atlas implementation uses `$search` in an aggregation pipeline via Prisma `aggregateRaw()`:
+- file: `services/search_service/atlasTemplateSearch.ts`
+- default index name: `configTemplate_text`
+
+You must create an Atlas Search index for the `ConfigTemplate` collection that supports:
+- `tags` (array of strings)
+- `description` (string)
+
+Notes:
+- This service searches **only** the fields above (per `prisma/schema.prisma`).
+- If you use a different index name, pass it via `new AtlasTemplateSearch({ indexName: "..." })`.
+
+### Usage example
+
+```ts
+import { SearchService } from "@/services/search_service/searchService";
+
+const searchService = new SearchService();
+
+const result = await searchService.searchConfigTemplates({
+  title: "Bench press strength",
+  description: "I want to increase my 1RM. 3 workouts per week.",
+});
+
+// Top hit ID (if any)
+const bestTemplateId = result.hits[0]?.templateId;
+```
+
+### Extending later: AI fallback strategy
+
+`SearchService` is built around a strategy interface:
+- `TemplateSearchStrategy.searchConfigTemplates(input)`
+
+Right now `SearchService` uses the Atlas strategy by default.
+In the future you can inject an AI semantic strategy as a fallback:
+
+```ts
+import { SearchService } from "@/services/search_service/searchService";
+
+const searchService = new SearchService({
+  atlas: /* your Atlas strategy (default if omitted) */,
+  ai: /* your AI strategy implementing TemplateSearchStrategy */,
+});
+```
+
+---
+
 ## Tests
 
-### Unit/placeholder tests
-- `__tests__/ai-service.test.ts` — currently a placeholder
+### AI service integration tests
+- `__tests__/ai-service.test.ts`
+  - **Requires**: `DATABASE_URL` and `OPENAI_API_KEY` (skipped if missing)
+  - **Case 1**: Model correctly identifies best matching template
+  - **Case 2**: Model handles no-match scenario (not_found/inconsistent/fallback)
+  - **Case 3**: Zod validation rejects invalid input at runtime
 
 ### Init service (unit tests)
 - `__tests__/init-service.test.ts`
@@ -317,7 +481,7 @@ npx prisma generate
 - Replace mocked UI projects with real DB-backed data.
 - Finish `create-activities` API route.
 - Consolidate init flow (`services/init_service/*`) with the current Prisma schema.
-- Add acceptance tests for `aiService` (with API mocking).
+- Add acceptance tests for `semantic_search` (with API mocking).
 
 ---
 
