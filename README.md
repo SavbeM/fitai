@@ -1,8 +1,7 @@
 # FIT AI — AI‑powered fitness coach
 
 FIT AI is a Next.js app that uses AI (OpenAI) + Prisma (MongoDB) to help users:
-- create fitness projects (goal + description)
-- generate a profile structure / biometrics schema
+- create fitness projects 
 - generate a workout plan (WorkoutPlan + Activities)
 - track activities and progress over time
 
@@ -28,11 +27,97 @@ This repo is currently a **work-in-progress**: the UI contains mock project data
   - `app/(pages)/projects/page.tsx` — projects UI (currently mocked)
   - `app/api/*` — API routes
 - `services/`
-  - `services/ai_service/aiService.ts` — OpenAI-backed generation (profile, goals, activities, algorithm)
+  - `services/ai_service/` — OpenAI-backed semantic search and template selection
   - `services/database_service/` — Prisma-backed persistence + mapping helpers
   - `services/init_service/` — orchestration for project initialization (builder pattern; WIP)
+  - `services/search_service/` — search service for finding relevant ConfigTemplates
 - `prisma/schema.prisma` — MongoDB schema
 - `__tests__/` — Jest tests (includes reusable DB acceptance tests)
+
+---
+
+## AI Service (`services/ai_service/`)
+
+The AI service provides intelligent template selection using OpenAI. It implements a RAG-ish (Retrieval Augmented Generation) approach.
+
+### Module Structure
+
+| File | Description |
+|------|-------------|
+| `semantic_search.ts` | Main entry point. Fetches candidates from DB, sends to OpenAI, validates response. |
+| `prompts.ts` | System and user prompt templates for OpenAI chat completions. |
+| `AIServiceTypes.ts` | TypeScript types and Zod schemas for input/output validation. |
+
+### How It Works
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│  User Input     │───▶│  Fetch DB       │───▶│  OpenAI API     │
+│  title + desc   │    │  Candidates     │    │  (gpt-5-nano)  │
+└─────────────────┘    └─────────────────┘    └─────────────────┘
+                                                      │
+                       ┌─────────────────┐            │
+                       │  Zod Validate   │◀───────────┘
+                       │  + Guard Check  │
+                       └─────────────────┘
+                               │
+                       ┌─────────────────┐
+                       │  AiTemplatePick │
+                       │  (result)       │
+                       └─────────────────┘
+```
+
+1. **Validate input** — Zod schema ensures title/description are non-empty strings.
+2. **Fetch candidates** — Retrieves ConfigTemplates from MongoDB (limited by `candidateLimit`).
+3. **Build prompt** — Creates structured prompt with project info and candidate list.
+4. **Call OpenAI** — Uses `gpt-5-nano` with JSON response mode (temperature=0).
+5. **Validate response** — Zod schema validates AI response structure.
+6. **Guard check** — Ensures picked `templateId` exists in candidate list (prevents hallucination).
+
+### Types & Schemas
+
+#### `SemanticSearchInput` (Input DTO)
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `title` | `string` | ✅ | Short project goal (e.g., "Bench press strength"). |
+| `description` | `string` | ✅ | Detailed project description with user intent. |
+| `candidateLimit` | `number` | ❌ | Max templates to pass to AI (1–200, default ~30). |
+
+#### `AiTemplatePick` (Output DTO)
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `status` | `"ok" \| "not_found" \| "inconsistent"` | Selection outcome. |
+| `templateId` | `string?` | Selected ConfigTemplate ID (only when status is "ok"). |
+| `confidence` | `number?` | Model confidence score (0–1). |
+| `reason` | `string?` | Human-readable explanation. |
+
+### Usage Example
+
+```ts
+import { semanticSearchConfigTemplate } from "@/services/ai_service/semantic_search";
+
+const result = await semanticSearchConfigTemplate({
+  title: "Bench press strength",
+  description: "I want to increase my 1RM bench press",
+  candidateLimit: 20,
+});
+
+if (result.status === "ok") {
+  console.log("Best template:", result.templateId);
+  console.log("Confidence:", result.confidence);
+} else {
+  console.log("No match:", result.reason);
+}
+```
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `OPENAI_API_KEY` | ✅ | OpenAI API key for chat completions. |
+| `DATABASE_URL` | ✅ | MongoDB connection string (for fetching candidates). |
 
 ---
 
@@ -218,7 +303,7 @@ cp .env.example .env
 
 ```bash
 DATABASE_URL="mongodb+srv://.../fitai?..."
-OPENAI_API_KEY="..." # optional unless calling aiService or API routes that use it
+OPENAI_API_KEY="..." # optional unless calling semantic_search or API routes that use it
 ```
 
 4) Generate Prisma client
@@ -255,10 +340,124 @@ Mapping between raw DTOs and Prisma inputs lives in:
 
 ---
 
+## Search service
+
+`services/search_service/`
+
+Extensible search layer for finding relevant `ConfigTemplate` entries using strategy pattern.
+
+### Files
+
+| File | Description |
+|------|-------------|
+| `searchService.ts` | Main entry point with strategy pattern |
+| `atlasTemplateSearch.ts` | Atlas Search (text matching) strategy |
+| `smartTemplateSearch.ts` | AI-powered (OpenAI semantic) strategy |
+| `searchServiceTypes.ts` | Types and Zod schemas |
+
+### Strategies
+
+**AtlasTemplateSearch** — fast text-based search via MongoDB Atlas:
+- Matches `title` → `ConfigTemplate.tags` (boost 8x)
+- Matches `description` → `ConfigTemplate.description` (boost 4x)
+- Returns multiple hits sorted by relevance score
+
+**SmartTemplateSearch** — AI-powered semantic search via OpenAI:
+- Sends candidates to OpenAI for intelligent selection
+- Returns single best match with confidence and reason
+- Handles "inconsistent" user input gracefully
+
+### Input / Output
+
+**Input** (`TemplateSearchInput`):
+- `title: string` — project title
+- `description: string` — project description
+
+**Output** (`TemplateSearchResult`):
+- `hits[]` — matched templates:
+  - `templateId` — ConfigTemplate ID
+  - `score?` — relevance score (Atlas)
+  - `highlights?` — matched text fragments (Atlas)
+  - `confidence?` — AI confidence 0-1 (Smart)
+  - `reason?` — AI explanation (Smart)
+- `meta`:
+  - `strategy` — "atlas_text" | "ai_semantic"
+  - `indexName` — Atlas index or "openai"
+  - `executionMs?` — query time in ms
+  - `aiStatus?` — "ok" | "not_found" | "inconsistent" (Smart only)
+  - `aiReason?` — AI explanation for status (Smart only)
+- `error?` — present only on failure `{ code, message, cause? }`
+
+### Error handling
+
+Best-effort layer — never throws, always returns valid result:
+- Empty input → returns empty hits with `VALIDATION_ERROR`
+- Atlas/AI failure → catches error, returns `SEARCH_ERROR`
+- Response parse failure → returns `VALIDATION_ERROR`
+
+### Usage
+
+```ts
+import { SearchService } from "@/services/search_service/searchService";
+
+// SearchService uses Atlas first, falls back to AI if no hits
+const result = await new SearchService().searchConfigTemplates({
+  title: "Bench press",
+  description: "Improve 1RM",
+});
+
+if (result.error) {
+  console.warn("Search failed:", result.error.message);
+}
+
+// Check AI status for semantic strategy
+if (result.meta.strategy === "ai_semantic") {
+  console.log("AI status:", result.meta.aiStatus);
+  console.log("AI reason:", result.meta.aiReason);
+}
+
+const bestMatch = result.hits[0]?.templateId;
+```
+
+### Atlas Search requirements
+
+Requires an Atlas Search index named `configTemplate_text` on `ConfigTemplate` collection with fields:
+- `tags` (array of strings)
+- `description` (string)
+
+### AI requirements
+
+SmartTemplateSearch requires `OPENAI_API_KEY` environment variable.
+
+---
+
 ## Tests
 
-### Unit/placeholder tests
-- `__tests__/ai-service.test.ts` — currently a placeholder
+### Search service tests
+- `__tests__/search-service.test.ts`
+  - **Unit tests** (always run, use mocks):
+    - Case 1: Atlas returns hits
+    - Case 2: Atlas empty, no AI fallback
+    - Case 3: Invalid input throws Zod error
+    - Case 4: Fallback to AI when Atlas empty
+    - Case 5: AI returns not_found
+    - Case 6: Garbage input handled gracefully
+  - **Integration tests** (require `DATABASE_URL` + `OPENAI_API_KEY`, skipped if missing):
+    - Case 1: AtlasSearch finds result
+    - Case 2: AtlasSearch returns empty (no match)
+    - Case 3: AtlasSearch handles empty input gracefully
+    - Case 4: SmartSearch finds result via OpenAI
+    - Case 5: SmartSearch returns not_found for unrelated query
+    - Case 6: Garbage/nonsense input handled
+    - Case 7: Full SearchService flow (Atlas → AI fallback)
+
+### AI service integration tests
+- `__tests__/ai-service.test.ts`
+  - **Requires**: `DATABASE_URL` and `OPENAI_API_KEY` (skipped if missing)
+  - **Case 1**: Model correctly identifies best matching template
+  - **Case 2**: Model handles no-match scenario (not_found/inconsistent/fallback)
+  - **Case 3**: Zod validation rejects invalid input at runtime
+  - **Case 4**: Model returns inconsistent for contradictory input
 
 ### Init service (unit tests)
 - `__tests__/init-service.test.ts`
@@ -278,8 +477,9 @@ Run:
 
 ```bash
 npm test
-# or only DB tests
-npm run test-db
+# or specific tests
+npm run test -- --testPathPattern=search-service
+npm run test -- --testPathPattern=ai-service
 ```
 
 ---
@@ -317,7 +517,7 @@ npx prisma generate
 - Replace mocked UI projects with real DB-backed data.
 - Finish `create-activities` API route.
 - Consolidate init flow (`services/init_service/*`) with the current Prisma schema.
-- Add acceptance tests for `aiService` (with API mocking).
+- Add acceptance tests for `semantic_search` (with API mocking).
 
 ---
 
