@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "test": "jest",
+    "test-search": "jest __tests__/search-service.test.ts",
     "test-ai": "jest __tests__/ai-service.test.ts",
     "test-db": "jest __tests__/db-service.test.ts",
     "test-init": "jest __tests__/init-service.test.ts",

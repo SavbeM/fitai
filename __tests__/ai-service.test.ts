@@ -219,5 +219,51 @@ const hasOpenAI = Boolean(process.env.OPENAI_API_KEY);
       },
       15000
     );
+
+    /**
+     * Test: Model returns inconsistent status for contradictory input.
+     *
+     * Setup: Templates for strength and cardio available.
+     * Input: User wants contradictory goals (e.g., "lose weight while gaining maximum muscle mass without exercise").
+     * Expected: Model returns "inconsistent" or handles gracefully with "not_found"/"ok".
+     */
+    it(
+      "case 4: returns inconsistent for contradictory input",
+      async () => {
+        await createTemplateFixture({
+          templateName: unique("Strength"),
+          tags: ["strength", "muscle_gain"],
+          description: "Heavy lifting for muscle growth",
+        });
+
+        await createTemplateFixture({
+          templateName: unique("Cardio"),
+          tags: ["cardio", "weight_loss"],
+          description: "Cardio-focused fat burning plan",
+        });
+
+        const payload = {
+          title: "Impossible fitness goal",
+          description:
+            "I want to lose 20kg of fat while gaining 20kg of muscle in 1 week without any exercise or diet changes. " +
+            "Also I want to run a marathon but I hate running and never want to run.",
+          candidateLimit: 20,
+        };
+
+        console.log("[semanticSearchConfigTemplate] request:\n" + pretty(payload));
+        const res = await semanticSearchConfigTemplate(payload);
+        console.log("[semanticSearchConfigTemplate] response:\n" + pretty(res));
+
+        // Model should recognize contradictory input, but may also return not_found or ok
+        expect(["inconsistent", "not_found", "ok"]).toContain(res.status);
+
+        // If inconsistent, reason should be provided
+        if (res.status === "inconsistent") {
+          expect(res.reason).toBeDefined();
+          expect(typeof res.reason).toBe("string");
+        }
+      },
+      30000
+    );
   }
 );

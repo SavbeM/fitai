@@ -340,82 +340,116 @@ Mapping between raw DTOs and Prisma inputs lives in:
 
 ---
 
-## Search service (Atlas Search + extensible strategies)
+## Search service
 
 `services/search_service/`
 
-This module provides an **extensible search layer** for selecting the most relevant `ConfigTemplate`.
+Extensible search layer for finding relevant `ConfigTemplate` entries using strategy pattern.
 
-### What it does today
+### Files
 
-- Runs **MongoDB Atlas Search** against the `ConfigTemplate` collection.
-- Match logic (current contract):
-  - searches **`ConfigTemplate.tags`** using the user-provided project **`title`**
-  - searches **`ConfigTemplate.description`** using the user-provided project **`description`**
+| File | Description |
+|------|-------------|
+| `searchService.ts` | Main entry point with strategy pattern |
+| `atlasTemplateSearch.ts` | Atlas Search (text matching) strategy |
+| `smartTemplateSearch.ts` | AI-powered (OpenAI semantic) strategy |
+| `searchServiceTypes.ts` | Types and Zod schemas |
 
-Entry point:
-- `SearchService.searchConfigTemplates(input)`
+### Strategies
 
-### Input / Output contract
+**AtlasTemplateSearch** — fast text-based search via MongoDB Atlas:
+- Matches `title` → `ConfigTemplate.tags` (boost 8x)
+- Matches `description` → `ConfigTemplate.description` (boost 4x)
+- Returns multiple hits sorted by relevance score
+
+**SmartTemplateSearch** — AI-powered semantic search via OpenAI:
+- Sends candidates to OpenAI for intelligent selection
+- Returns single best match with confidence and reason
+- Handles "inconsistent" user input gracefully
+
+### Input / Output
 
 **Input** (`TemplateSearchInput`):
-- `title: string` (required)
-- `description: string` (required)
+- `title: string` — project title
+- `description: string` — project description
 
 **Output** (`TemplateSearchResult`):
-- `hits`: array of `{ templateId, score?, highlights? }`
-- `meta`: `{ strategy, indexName, executionMs? }`
+- `hits[]` — matched templates:
+  - `templateId` — ConfigTemplate ID
+  - `score?` — relevance score (Atlas)
+  - `highlights?` — matched text fragments (Atlas)
+  - `confidence?` — AI confidence 0-1 (Smart)
+  - `reason?` — AI explanation (Smart)
+- `meta`:
+  - `strategy` — "atlas_text" | "ai_semantic"
+  - `indexName` — Atlas index or "openai"
+  - `executionMs?` — query time in ms
+  - `aiStatus?` — "ok" | "not_found" | "inconsistent" (Smart only)
+  - `aiReason?` — AI explanation for status (Smart only)
+- `error?` — present only on failure `{ code, message, cause? }`
+
+### Error handling
+
+Best-effort layer — never throws, always returns valid result:
+- Empty input → returns empty hits with `VALIDATION_ERROR`
+- Atlas/AI failure → catches error, returns `SEARCH_ERROR`
+- Response parse failure → returns `VALIDATION_ERROR`
+
+### Usage
+
+```ts
+import { SearchService } from "@/services/search_service/searchService";
+
+// SearchService uses Atlas first, falls back to AI if no hits
+const result = await new SearchService().searchConfigTemplates({
+  title: "Bench press",
+  description: "Improve 1RM",
+});
+
+if (result.error) {
+  console.warn("Search failed:", result.error.message);
+}
+
+// Check AI status for semantic strategy
+if (result.meta.strategy === "ai_semantic") {
+  console.log("AI status:", result.meta.aiStatus);
+  console.log("AI reason:", result.meta.aiReason);
+}
+
+const bestMatch = result.hits[0]?.templateId;
+```
 
 ### Atlas Search requirements
 
-The Atlas implementation uses `$search` in an aggregation pipeline via Prisma `aggregateRaw()`:
-- file: `services/search_service/atlasTemplateSearch.ts`
-- default index name: `configTemplate_text`
-
-You must create an Atlas Search index for the `ConfigTemplate` collection that supports:
+Requires an Atlas Search index named `configTemplate_text` on `ConfigTemplate` collection with fields:
 - `tags` (array of strings)
 - `description` (string)
 
-Notes:
-- This service searches **only** the fields above (per `prisma/schema.prisma`).
-- If you use a different index name, pass it via `new AtlasTemplateSearch({ indexName: "..." })`.
+### AI requirements
 
-### Usage example
-
-```ts
-import { SearchService } from "@/services/search_service/searchService";
-
-const searchService = new SearchService();
-
-const result = await searchService.searchConfigTemplates({
-  title: "Bench press strength",
-  description: "I want to increase my 1RM. 3 workouts per week.",
-});
-
-// Top hit ID (if any)
-const bestTemplateId = result.hits[0]?.templateId;
-```
-
-### Extending later: AI fallback strategy
-
-`SearchService` is built around a strategy interface:
-- `TemplateSearchStrategy.searchConfigTemplates(input)`
-
-Right now `SearchService` uses the Atlas strategy by default.
-In the future you can inject an AI semantic strategy as a fallback:
-
-```ts
-import { SearchService } from "@/services/search_service/searchService";
-
-const searchService = new SearchService({
-  atlas: /* your Atlas strategy (default if omitted) */,
-  ai: /* your AI strategy implementing TemplateSearchStrategy */,
-});
-```
+SmartTemplateSearch requires `OPENAI_API_KEY` environment variable.
 
 ---
 
 ## Tests
+
+### Search service tests
+- `__tests__/search-service.test.ts`
+  - **Unit tests** (always run, use mocks):
+    - Case 1: Atlas returns hits
+    - Case 2: Atlas empty, no AI fallback
+    - Case 3: Invalid input throws Zod error
+    - Case 4: Fallback to AI when Atlas empty
+    - Case 5: AI returns not_found
+    - Case 6: Garbage input handled gracefully
+  - **Integration tests** (require `DATABASE_URL` + `OPENAI_API_KEY`, skipped if missing):
+    - Case 1: AtlasSearch finds result
+    - Case 2: AtlasSearch returns empty (no match)
+    - Case 3: AtlasSearch handles empty input gracefully
+    - Case 4: SmartSearch finds result via OpenAI
+    - Case 5: SmartSearch returns not_found for unrelated query
+    - Case 6: Garbage/nonsense input handled
+    - Case 7: Full SearchService flow (Atlas → AI fallback)
 
 ### AI service integration tests
 - `__tests__/ai-service.test.ts`
@@ -423,6 +457,7 @@ const searchService = new SearchService({
   - **Case 1**: Model correctly identifies best matching template
   - **Case 2**: Model handles no-match scenario (not_found/inconsistent/fallback)
   - **Case 3**: Zod validation rejects invalid input at runtime
+  - **Case 4**: Model returns inconsistent for contradictory input
 
 ### Init service (unit tests)
 - `__tests__/init-service.test.ts`
@@ -442,8 +477,9 @@ Run:
 
 ```bash
 npm test
-# or only DB tests
-npm run test-db
+# or specific tests
+npm run test -- --testPathPattern=search-service
+npm run test -- --testPathPattern=ai-service
 ```
 
 ---

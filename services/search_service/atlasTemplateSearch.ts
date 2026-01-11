@@ -2,22 +2,32 @@ import { prisma } from "@/services/database_service/databaseService";
 import {
   TemplateSearchInput,
   TemplateSearchResult,
+  TemplateSearchError, JsonObject, RawHitsSchema,
 } from "@/services/search_service/searchServiceTypes";
 import { z } from "zod";
 
-// Prisma expects `aggregateRaw` pipeline to be JSON-like values.
-// We keep a small local JSON type to satisfy TS without falling back to `any`.
-type JsonPrimitive = string | number | boolean | null;
-type JsonValue = JsonPrimitive | JsonObject | JsonValue[];
-type JsonObject = { [key: string]: JsonValue };
+
+/** Creates an empty result with optional error */
+function emptyResult(
+  indexName: string,
+  executionMs: number,
+  error?: TemplateSearchError
+): TemplateSearchResult {
+  return {
+    hits: [],
+    meta: { strategy: "atlas_text", indexName, executionMs },
+    error,
+  };
+}
+
 
 /**
  * Atlas Search implementation for ConfigTemplate lookup.
+ * Best-effort layer: validates input, catches errors, never throws.
  *
- * Requires an Atlas Search index on the `ConfigTemplate` collection.
- * Default index name is "configTemplate_text" (overridable).
- *
- * Intended to be used as a strategy in SearchService.
+ * @param opts.indexName - Atlas Search index name (default: "configTemplate_text")
+ * @param opts.limit - Max results to return (default: 5)
+ * @param opts.minScore - Minimum score threshold, results below are filtered out
  */
 export class AtlasTemplateSearch {
   constructor(
@@ -28,108 +38,96 @@ export class AtlasTemplateSearch {
     } = {}
   ) {}
 
+  /**
+   * Searches ConfigTemplates via Atlas Search. Never throws.
+   *
+   * @param input.title - Project title, matched against ConfigTemplate.tags (boost 8x) and description (boost 2x)
+   * @param input.description - Project description, matched against ConfigTemplate.description (boost 4x)
+   *
+   * @returns TemplateSearchResult
+   *   - hits[].templateId - Matched ConfigTemplate ID
+   *   - hits[].score - Atlas Search relevance score
+   *   - hits[].highlights - Matched text fragments (for UI display)
+   *   - meta.strategy - Always "atlas_text"
+   *   - meta.indexName - Used Atlas index name
+   *   - meta.executionMs - Query execution time in ms
+   *   - error - Present only on failure (code: VALIDATION_ERROR | SEARCH_ERROR)
+   */
   async searchConfigTemplates(input: TemplateSearchInput): Promise<TemplateSearchResult> {
     const indexName = this.opts.indexName ?? "configTemplate_text";
     const limit = this.opts.limit ?? 5;
-
     const start = Date.now();
 
-    // Search contract:
-    // - ConfigTemplate.tags  <- input.title (unformatted)
-    // - ConfigTemplate.description <- input.description
-    const titleQuery = input.title.trim();
-    const descriptionQuery = input.description.trim();
+    const titleQuery = input.title?.trim() ?? "";
+    const descriptionQuery = input.description?.trim() ?? "";
 
-    const should: JsonObject[] = [
-      {
-        text: {
-          query: titleQuery,
-          path: "tags",
-          score: { boost: { value: 8 } },
-        },
-      },
-      {
-        text: {
-          query: descriptionQuery,
-          path: "description",
-          score: { boost: { value: 4 } },
-        },
-      },
-      // Small extra signal: allow title tokens to match description too.
-      {
-        text: {
-          query: titleQuery,
-          path: "description",
-          score: { boost: { value: 2 } },
-        },
-      },
-    ];
+    if (!titleQuery && !descriptionQuery) {
+      return emptyResult(indexName, Date.now() - start, {
+        code: "VALIDATION_ERROR",
+        message: "Both title and description are empty. Search skipped.",
+      });
+    }
 
-    const RawHitSchema = z.object({
-      _id: z.union([z.string(), z.object({}).passthrough()]),
-      score: z.number().optional(),
-      highlights: z.unknown().optional(),
-    });
+    try {
+      const should: JsonObject[] = [];
 
-    const RawHitsSchema = z.array(RawHitSchema);
+      if (titleQuery) {
+        should.push(
+          { text: { query: titleQuery, path: "tags", score: { boost: { value: 8 } } } },
+          { text: { query: titleQuery, path: "description", score: { boost: { value: 2 } } } }
+        );
+      }
 
-    // Prisma Mongo: use aggregateRaw to run $search.
-    const pipeline: JsonObject[] = [
-      {
-        $search: {
-          index: indexName,
-          compound: {
-            should,
-            minimumShouldMatch: 1,
-          },
-          highlight: {
-            path: ["description", "tags"],
+      if (descriptionQuery) {
+        should.push({
+          text: { query: descriptionQuery, path: "description", score: { boost: { value: 4 } } },
+        });
+      }
+
+      const pipeline: JsonObject[] = [
+        {
+          $search: {
+            index: indexName,
+            compound: { should, minimumShouldMatch: 1 },
+            highlight: { path: ["description", "tags"] },
           },
         },
-      },
-      {
-        $project: {
-          _id: 1,
-          score: { $meta: "searchScore" },
-          highlights: { $meta: "searchHighlights" },
-        },
-      },
-      { $sort: { score: -1 } },
-      { $limit: limit },
-    ];
+        { $project: { _id: 1, score: { $meta: "searchScore" }, highlights: { $meta: "searchHighlights" } } },
+        { $sort: { score: -1 } },
+        { $limit: limit },
+      ];
 
-    const rawUnknown: unknown = await prisma.configTemplate.aggregateRaw({
-      pipeline,
-    });
+      const rawUnknown: unknown = await prisma.configTemplate.aggregateRaw({ pipeline });
 
-    // aggregateRaw may return an array directly or an object wrapper depending on Prisma version/runtime.
-    const rawDocsUnknown: unknown = Array.isArray(rawUnknown)
-      ? rawUnknown
-      : (rawUnknown as { result?: unknown } | null | undefined)?.result ?? [];
+      const rawDocs: unknown = Array.isArray(rawUnknown)
+        ? rawUnknown
+        : (rawUnknown as { result?: unknown } | null)?.result ?? [];
 
-    const docs = RawHitsSchema.parse(rawDocsUnknown);
+      const docs = RawHitsSchema.parse(rawDocs);
 
-    const minScore = this.opts.minScore;
-    const hits = docs
-      .map((d) => ({
-        templateId: typeof d._id === "string" ? d._id : JSON.stringify(d._id),
-        score: d.score,
-        // Atlas highlight meta format is not strongly typed; keep it as unknown in parsing,
-        // but expose as the declared `Record<string, string[]> | undefined` only when it matches.
-        highlights:
-          d.highlights && typeof d.highlights === "object" && !Array.isArray(d.highlights)
+      const minScore = this.opts.minScore;
+      const hits = docs
+        .map((d) => ({
+          templateId: String(d._id),
+          score: d.score,
+          highlights: d.highlights && typeof d.highlights === "object" && !Array.isArray(d.highlights)
             ? (d.highlights as Record<string, string[]>)
             : undefined,
-      }))
-      .filter((h) => (minScore == null ? true : (h.score ?? 0) >= minScore));
+        }))
+        .filter((h) => minScore == null || (h.score ?? 0) >= minScore);
 
-    return {
-      hits,
-      meta: {
-        strategy: "atlas_text",
-        indexName,
-        executionMs: Date.now() - start,
-      },
-    };
+      return {
+        hits,
+        meta: { strategy: "atlas_text", indexName, executionMs: Date.now() - start },
+      };
+    } catch (err) {
+      console.error("[AtlasTemplateSearch] Search failed:", err);
+
+      const error: TemplateSearchError = err instanceof z.ZodError
+        ? { code: "VALIDATION_ERROR", message: "Response validation failed", cause: err.errors }
+        : { code: "SEARCH_ERROR", message: err instanceof Error ? err.message : "Unknown error", cause: err };
+
+      return emptyResult(indexName, Date.now() - start, error);
+    }
   }
 }

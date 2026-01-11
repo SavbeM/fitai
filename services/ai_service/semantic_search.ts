@@ -48,7 +48,7 @@ function getOpenAIClient(): OpenAI {
  * 1. Validate input with Zod schema.
  * 2. Fetch all ConfigTemplates from DB (limited by `candidateLimit`).
  * 3. Build a user prompt with project info and candidate list.
- * 4. Call OpenAI (gpt-4o-mini, temperature=0) with JSON response mode.
+ * 4. Call OpenAI (gpt-5-nano) with JSON response mode.
  * 5. Parse and validate response with `AiTemplatePickSchema`.
  * 6. Extra guard: ensure picked templateId exists in candidates.
  *
@@ -128,19 +128,9 @@ export async function semanticSearchConfigTemplate(
     }
   }
 
+
+  if (pick.status === "inconsistent"){
+    return { status: "inconsistent", reason: "Inconsistent input data" };
+  }
   return pick;
 }
-
-/* ───────────────────────────────────────────────────────────────────────────
- * Module Export
- * ─────────────────────────────────────────────────────────────────────────── */
-
-/**
- * AI service module for semantic template search.
- *
- * Exposes:
- * - `semanticSearchConfigTemplate` — Finds best matching ConfigTemplate via OpenAI.
- */
-export const semantic_search = {
-  semanticSearchConfigTemplate,
-};
