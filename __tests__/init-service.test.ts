@@ -21,7 +21,7 @@ jest.mock("@/services/init_service/initProjectService", () => {
 
 import { databaseService } from "@/services/database_service/databaseService";
 
-describe("init-service", () => {
+describe("init-service (unit tests)", () => {
   beforeEach(() => {
     jest.clearAllMocks();
   });

@@ -7,6 +7,7 @@
     "prepare": "next-ws patch",
     "build": "next build",
     "start": "next start",
+    "seed": "tsx prisma/seed.ts",
     "test": "jest",
     "test-search": "jest __tests__/search-service.test.ts",
     "test-ai": "jest __tests__/ai-service.test.ts",

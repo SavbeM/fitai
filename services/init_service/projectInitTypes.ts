@@ -1,4 +1,4 @@
-import {Project} from "@prisma/client";
+import {ConfigTemplate, Project} from "@prisma/client";
 
 export interface ProjectBuilderParams {
     userId: string;
@@ -11,11 +11,13 @@ export interface ProjectBuilderContext {
     title: string;
     description: string;
     project?: Project;
+    configTemplate?: ConfigTemplate;
 }
 
 
 export const StepName = {
     CREATE_PROJECT: "createProject",
+    GET_CONFIG_TEMPLATE: "getConfigTemplate",
 } as const;
 
 export type StepNameType = (typeof StepName)[keyof typeof StepName];
