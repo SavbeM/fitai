@@ -80,9 +80,9 @@ The AI service provides intelligent template selection using OpenAI. It implemen
 
 | Property | Type | Required | Description |
 |----------|------|----------|-------------|
-| `title` | `string` | ✅ | Short project goal (e.g., "Bench press strength"). |
-| `description` | `string` | ✅ | Detailed project description with user intent. |
-| `candidateLimit` | `number` | ❌ | Max templates to pass to AI (1–200, default ~30). |
+| `title` | `string` | `true`   | Short project goal (e.g., "Bench press strength"). |
+| `description` | `string` | `true`   | Detailed project description with user intent. |
+| `candidateLimit` | `number` | `false`  | Max templates to pass to AI (1–200, default ~30). |
 
 #### `AiTemplatePick` (Output DTO)
 
@@ -115,9 +115,9 @@ if (result.status === "ok") {
 ### Environment Variables
 
 | Variable | Required | Description |
-|----------|----------|-------------|
-| `OPENAI_API_KEY` | ✅ | OpenAI API key for chat completions. |
-| `DATABASE_URL` | ✅ | MongoDB connection string (for fetching candidates). |
+|----------|---------|-------------|
+| `OPENAI_API_KEY` | `true`  | OpenAI API key for chat completions. |
+| `DATABASE_URL` | `true`    | MongoDB connection string (for fetching candidates). |
 
 ---
 
@@ -489,7 +489,7 @@ npm run test -- --testPathPattern=ai-service
 ### “empty database name not allowed” (MongoDB Atlas)
 Your `DATABASE_URL` is missing a database name.
 
-✅ Must look like:
+Must look like:
 
 ```bash
 mongodb+srv://USER:PASS@HOST/<dbName>?...
