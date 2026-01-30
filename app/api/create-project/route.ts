@@ -26,7 +26,7 @@ export function GET() {
 export async function UPGRADE(client: WebSocket) {
 
   send(client, { type: "hello" });
-
+  const service = new InitProjectService();
   client.on("message", async (data) => {
     let parsed: ClientMessage;
     try {
@@ -41,20 +41,25 @@ export async function UPGRADE(client: WebSocket) {
 
     const { userId, title, description } = parsed.payload;
 
-    const service = new InitProjectService();
+
     try {
       await service.initProject(userId, title, description, (stepResponse) => {
         send(client, { type: "step", payload: stepResponse });
+        if(!stepResponse.success){
+          client.close(1011, stepResponse.message);
+        }
       });
 
 
     } catch (e) {
       const message = JSON.stringify(e);
       send(client, { type: "error", payload: { message } });
+      client.close(1011, "Internal error");
     }
   });
 
   client.on("close", () => {
+    service.handleClose()
     console.log("Client connection closed");
   });
 
